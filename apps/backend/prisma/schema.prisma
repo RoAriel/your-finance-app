@@ -8,13 +8,76 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ===========================================
+// USER MODEL
+// ===========================================
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String    @id @default(uuid())
+  email     String    @unique
   password  String
   name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  
+  // Relaciones
+  transactions Transaction[]
+  categories   Category[]
+  
   @@map("users")
+}
+
+// ===========================================
+// TRANSACTION MODEL
+// ===========================================
+model Transaction {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String    // 'income' | 'expense'
+  amount      Decimal   @db.Decimal(15, 2)
+  currency    String    @default("ARS")
+  description String?   @db.Text
+  date        DateTime  @default(now())
+  categoryId  String?   @map("category_id")
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  
+  // Relaciones
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  
+  // Índices para mejorar performance
+  @@index([userId])
+  @@index([date])
+  @@index([categoryId])
+  @@index([type])
+  @@map("transactions")
+}
+
+// ===========================================
+// CATEGORY MODEL
+// ===========================================
+model Category {
+  id     String  @id @default(uuid())
+  userId String  @map("user_id")
+  name   String
+  type   String  // 'income' | 'expense' | 'both'
+  color  String? // Hex color para UI (ej: "#FF5733")
+  icon   String? // Nombre del ícono para UI
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  
+  // Relaciones
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  
+  // Constraints
+  @@unique([userId, name, type])
+  @@index([userId])
+  @@map("categories")
 }
