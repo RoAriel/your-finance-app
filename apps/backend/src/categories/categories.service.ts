@@ -5,100 +5,160 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { Category } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { QueryCategoryDto } from './dto/query-category.dto';
+import { AppLogger } from '../common/utils/logger.util';
+import {
+  PaginatedResult,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class CategoriesService {
+  private readonly logger = new AppLogger(CategoriesService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  // Método seed corregido
   async seed(userId: string) {
-    // Verificar si ya existen categorías para este usuario
+    this.logger.log(`Seeding default categories for user: ${userId}`);
+
     const existingCategories = await this.prisma.category.findMany({
       where: { userId, deletedAt: null },
     });
 
     if (existingCategories.length > 0) {
-      // Ya tiene categorías, retornar las existentes con mensaje
+      this.logger.log(
+        `User ${userId} already has ${existingCategories.length} categories`,
+      );
       return {
         message: 'Categories already exist',
         categories: existingCategories,
       };
     }
 
-    // Categorías default para crear
     const defaultCategories = [
       // GASTOS
       {
         name: 'Supermercado',
-        type: 'expense',
+        type: 'expense' as const,
         color: '#FF6B6B',
         icon: 'shopping-cart',
       },
-      { name: 'Transporte', type: 'expense', color: '#4ECDC4', icon: 'car' },
-      { name: 'Salud', type: 'expense', color: '#95E1D3', icon: 'heart' },
+      {
+        name: 'Transporte',
+        type: 'expense' as const,
+        color: '#4ECDC4',
+        icon: 'car',
+      },
+      {
+        name: 'Salud',
+        type: 'expense' as const,
+        color: '#95E1D3',
+        icon: 'heart',
+      },
       {
         name: 'Entretenimiento',
-        type: 'expense',
+        type: 'expense' as const,
         color: '#F38181',
         icon: 'film',
       },
-      { name: 'Servicios', type: 'expense', color: '#AA96DA', icon: 'zap' },
+      {
+        name: 'Servicios',
+        type: 'expense' as const,
+        color: '#AA96DA',
+        icon: 'zap',
+      },
       {
         name: 'Restaurantes',
-        type: 'expense',
+        type: 'expense' as const,
         color: '#FCBAD3',
         icon: 'coffee',
       },
-      { name: 'Educación', type: 'expense', color: '#A8D8EA', icon: 'book' },
-      { name: 'Ropa', type: 'expense', color: '#FFD93D', icon: 'shopping-bag' },
+      {
+        name: 'Educación',
+        type: 'expense' as const,
+        color: '#A8D8EA',
+        icon: 'book',
+      },
+      {
+        name: 'Ropa',
+        type: 'expense' as const,
+        color: '#FFD93D',
+        icon: 'shopping-bag',
+      },
 
       // INGRESOS
-      { name: 'Salario', type: 'income', color: '#6BCF7F', icon: 'briefcase' },
-      { name: 'Freelance', type: 'income', color: '#4D96FF', icon: 'code' },
+      {
+        name: 'Salario',
+        type: 'income' as const,
+        color: '#6BCF7F',
+        icon: 'briefcase',
+      },
+      {
+        name: 'Freelance',
+        type: 'income' as const,
+        color: '#4D96FF',
+        icon: 'code',
+      },
       {
         name: 'Inversiones',
-        type: 'income',
+        type: 'income' as const,
         color: '#FFB830',
         icon: 'trending-up',
       },
-      { name: 'Bonos', type: 'income', color: '#C780FA', icon: 'gift' },
+      {
+        name: 'Bonos',
+        type: 'income' as const,
+        color: '#C780FA',
+        icon: 'gift',
+      },
 
       // AMBOS
       {
         name: 'Otros',
-        type: 'both',
+        type: 'both' as const,
         color: '#95A5A6',
         icon: 'more-horizontal',
       },
     ];
 
-    // Crear todas las categorías
-    const createdCategories = await Promise.all(
-      defaultCategories.map((category) =>
-        this.prisma.category.create({
-          data: {
-            ...category,
-            userId,
-          },
-        }),
-      ),
-    );
+    try {
+      const createdCategories = await Promise.all(
+        defaultCategories.map((category) =>
+          this.prisma.category.create({
+            data: {
+              ...category,
+              userId,
+            },
+          }),
+        ),
+      );
 
-    // Retornar objeto con message y categories
-    return {
-      message: 'Default categories created successfully',
-      categories: createdCategories,
-    };
+      this.logger.logSuccess('Seed categories', {
+        userId,
+        count: createdCategories.length,
+      });
+
+      return {
+        message: 'Default categories created successfully',
+        categories: createdCategories,
+      };
+    } catch (error) {
+      this.logger.logFailure('Seed categories', error as Error);
+      throw error;
+    }
   }
 
-  // CRUD methods...
-
   async create(dto: CreateCategoryDto, userId: string) {
-    // Verificar si ya existe una categoría con ese nombre y tipo
+    this.logger.logOperation('Create category', {
+      name: dto.name,
+      type: dto.type,
+      userId,
+    });
+
     const existing = await this.prisma.category.findFirst({
       where: {
         name: dto.name,
@@ -109,37 +169,74 @@ export class CategoriesService {
     });
 
     if (existing) {
+      this.logger.warn(
+        `Duplicate category attempt: ${dto.name} (${dto.type}) by user ${userId}`,
+      );
       throw new ConflictException(
         `Category "${dto.name}" with type "${dto.type}" already exists`,
       );
     }
 
-    return this.prisma.category.create({
-      data: {
-        ...dto,
-        userId,
-      },
-    });
+    try {
+      const category = await this.prisma.category.create({
+        data: {
+          ...dto,
+          userId,
+        },
+      });
+
+      this.logger.logSuccess('Create category', {
+        id: category.id,
+        name: category.name,
+      });
+      return category;
+    } catch (error) {
+      this.logger.logFailure('Create category', error as Error);
+      throw error;
+    }
   }
 
-  async findAll(query: QueryCategoryDto, userId: string) {
+  async findAll(
+    query: QueryCategoryDto,
+    userId: string,
+  ): Promise<PaginatedResult<Category>> {
+    this.logger.log(
+      `Finding categories for user ${userId} with filters: ${JSON.stringify(query)}`,
+    );
+
+    const { page = 1, limit = 20, type } = query;
+
     const where: any = {
       userId,
       deletedAt: null,
     };
 
-    // Filtrar por tipo si se especifica
-    if (query.type && query.type !== 'both') {
-      where.OR = [{ type: query.type }, { type: 'both' }];
+    if (type && type !== 'both') {
+      where.OR = [{ type }, { type: 'both' }];
     }
 
-    return this.prisma.category.findMany({
-      where,
-      orderBy: { name: 'asc' },
-    });
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.category.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.category.count({ where }),
+    ]);
+
+    this.logger.log(
+      `Found ${data.length} of ${total} categories for user ${userId}`,
+    );
+
+    return createPaginatedResponse(data, total, page, limit);
   }
 
   async findOne(id: string, userId: string) {
+    this.logger.log(`Finding category ${id} for user ${userId}`);
+
     const category = await this.prisma.category.findFirst({
       where: {
         id,
@@ -149,6 +246,7 @@ export class CategoriesService {
     });
 
     if (!category) {
+      this.logger.warn(`Category ${id} not found for user ${userId}`);
       throw new NotFoundException('Category not found');
     }
 
@@ -156,10 +254,10 @@ export class CategoriesService {
   }
 
   async update(id: string, dto: UpdateCategoryDto, userId: string) {
-    // Verificar que existe y pertenece al usuario
+    this.logger.logOperation('Update category', { id, updates: dto, userId });
+
     await this.findOne(id, userId);
 
-    // Si está actualizando el nombre, verificar que no exista otro con ese nombre
     if (dto.name) {
       const existing = await this.prisma.category.findFirst({
         where: {
@@ -171,26 +269,43 @@ export class CategoriesService {
       });
 
       if (existing) {
+        this.logger.warn(
+          `Duplicate category name in update: ${dto.name} by user ${userId}`,
+        );
         throw new ConflictException(`Category "${dto.name}" already exists`);
       }
     }
 
-    return this.prisma.category.update({
-      where: { id },
-      data: dto,
-    });
+    try {
+      const category = await this.prisma.category.update({
+        where: { id },
+        data: dto,
+      });
+
+      this.logger.logSuccess('Update category', { id, name: category.name });
+      return category;
+    } catch (error) {
+      this.logger.logFailure('Update category', error as Error);
+      throw error;
+    }
   }
 
   async remove(id: string, userId: string) {
-    // Verificar que existe y pertenece al usuario
+    this.logger.logOperation('Delete category', { id, userId });
+
     await this.findOne(id, userId);
 
-    // Soft delete
-    await this.prisma.category.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    try {
+      await this.prisma.category.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
 
-    return { message: 'Category deleted successfully' };
+      this.logger.logSuccess('Delete category', { id });
+      return { message: 'Category deleted successfully' };
+    } catch (error) {
+      this.logger.logFailure('Delete category', error as Error);
+      throw error;
+    }
   }
 }

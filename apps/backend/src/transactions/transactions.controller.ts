@@ -16,6 +16,8 @@ import { QueryTransactionDto } from './dto/query-transaction.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserPayload } from '../auth/interfaces/user-payload.interface';
+import { PaginatedResult } from '../common/dto/pagination.dto';
+import { Transaction } from '@prisma/client';
 
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
@@ -27,15 +29,15 @@ export class TransactionsController {
     @CurrentUser() user: UserPayload,
     @Body() createTransactionDto: CreateTransactionDto,
   ) {
-    return this.transactionsService.create(user.id, createTransactionDto);
+    return this.transactionsService.create(createTransactionDto, user.id);
   }
 
   @Get()
-  findAll(
-    @CurrentUser() user: UserPayload,
+  async findAll(
     @Query() query: QueryTransactionDto,
-  ) {
-    return this.transactionsService.findAll(user.id, query);
+    @CurrentUser('id') userId: string,
+  ): Promise<PaginatedResult<Transaction>> {
+    return this.transactionsService.findAll(query, userId);
   }
 
   @Get('balance')
@@ -54,7 +56,7 @@ export class TransactionsController {
     @Param('id') id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
   ) {
-    return this.transactionsService.update(user.id, id, updateTransactionDto);
+    return this.transactionsService.update(user.id, updateTransactionDto, id);
   }
 
   @Delete(':id')

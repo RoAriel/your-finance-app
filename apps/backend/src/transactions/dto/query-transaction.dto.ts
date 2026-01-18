@@ -1,7 +1,18 @@
-import { IsOptional, IsEnum, IsDateString, IsString } from 'class-validator';
-import { TransactionType } from './create-transaction.dto';
+import { IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
-export class QueryTransactionDto {
+export enum TransactionType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+}
+
+export enum Currency {
+  ARS = 'ARS',
+  USD = 'USD',
+  EUR = 'EUR',
+}
+
+export class QueryTransactionDto extends PaginationDto {
   @IsOptional()
   @IsEnum(TransactionType)
   type?: TransactionType;
@@ -15,6 +26,10 @@ export class QueryTransactionDto {
   endDate?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsEnum(Currency)
+  currency?: Currency;
 }

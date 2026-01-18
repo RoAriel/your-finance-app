@@ -1,7 +1,14 @@
-import { IsOptional, IsIn } from 'class-validator';
+import { IsOptional, IsEnum } from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
 
-export class QueryCategoryDto {
+export enum CategoryType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+  BOTH = 'both',
+}
+
+export class QueryCategoryDto extends PaginationDto {
   @IsOptional()
-  @IsIn(['income', 'expense', 'both'])
-  type?: 'income' | 'expense' | 'both';
+  @IsEnum(CategoryType)
+  type?: CategoryType;
 }

@@ -17,6 +17,8 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { QueryCategoryDto } from './dto/query-category.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PaginatedResult } from '../common/dto/pagination.dto';
+import { Category } from '@prisma/client';
 
 @Controller('categories')
 @UseGuards(JwtAuthGuard)
@@ -56,7 +58,7 @@ export class CategoriesController {
   async findAll(
     @Query() query: QueryCategoryDto,
     @CurrentUser('id') userId: string,
-  ) {
+  ): Promise<PaginatedResult<Category>> {
     return this.categoriesService.findAll(query, userId);
   }
 

@@ -1,163 +1,269 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+// src/transactions/transactions.service.ts
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../..//prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { QueryTransactionDto } from './dto/query-transaction.dto';
+import { AppLogger } from '../common/utils/logger.util';
+
+import {
+  PaginatedResult,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
 
 @Injectable()
 export class TransactionsService {
+  private readonly logger = new AppLogger(TransactionsService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  async create(userId: string, dto: CreateTransactionDto) {
-    return this.prisma.transaction.create({
-      data: {
-        userId,
-        type: dto.type,
-        amount: dto.amount,
-        currency: dto.currency || 'ARS',
-        description: dto.description,
-        date: dto.date ? new Date(dto.date) : new Date(),
-        categoryId: dto.categoryId,
-      },
-      include: {
-        category: true,
-      },
+  /**
+   * Crea una nueva transacción
+   */
+  async create(dto: CreateTransactionDto, userId: string) {
+    this.logger.logOperation('Create transaction', {
+      type: dto.type,
+      amount: dto.amount,
+      currency: dto.currency,
+      userId,
     });
+
+    try {
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          ...dto,
+          userId,
+        },
+        include: {
+          category: true,
+        },
+      });
+
+      this.logger.logSuccess('Create transaction', {
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        currency: transaction.currency,
+      });
+
+      return transaction;
+    } catch (error) {
+      this.logger.logFailure('Create transaction', error as Error);
+      throw error;
+    }
   }
 
-  async findAll(userId: string, query: QueryTransactionDto) {
-    const where: {
-      userId: string;
-      deletedAt: null;
-      type?: string;
-      categoryId?: string;
-      date?: {
-        gte?: Date;
-        lte?: Date;
-      };
-    } = {
+  /**
+   * Lista todas las transacciones del usuario con filtros y paginación
+   */
+  async findAll(
+    query: QueryTransactionDto,
+    userId: string,
+  ): Promise<PaginatedResult<any>> {
+    this.logger.log(
+      `Finding transactions for user ${userId} with filters: ${JSON.stringify(query)}`,
+    );
+
+    const {
+      page = 1,
+      limit = 20,
+      type,
+      startDate,
+      endDate,
+      categoryId,
+      currency,
+    } = query;
+
+    // Construir filtros
+    const where: any = {
       userId,
       deletedAt: null,
     };
 
-    if (query.type) {
-      where.type = query.type;
+    if (type) {
+      where.type = type;
     }
 
-    if (query.categoryId) {
-      where.categoryId = query.categoryId;
+    if (categoryId) {
+      where.categoryId = categoryId;
     }
 
-    if (query.startDate || query.endDate) {
+    if (currency) {
+      where.currency = currency;
+    }
+
+    if (startDate || endDate) {
       where.date = {};
-      if (query.startDate) {
-        where.date.gte = new Date(query.startDate);
+      if (startDate) {
+        where.date.gte = new Date(startDate);
       }
-      if (query.endDate) {
-        where.date.lte = new Date(query.endDate);
+      if (endDate) {
+        where.date.lte = new Date(endDate);
       }
     }
 
-    return this.prisma.transaction.findMany({
-      where,
-      include: {
-        category: true,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-    });
+    // Ejecutar query con paginación
+    const skip = (page - 1) * limit;
+
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.transaction.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            category: true,
+          },
+          orderBy: {
+            date: 'desc',
+          },
+        }),
+        this.prisma.transaction.count({ where }),
+      ]);
+
+      this.logger.log(
+        `Found ${data.length} of ${total} transactions for user ${userId}`,
+      );
+
+      return createPaginatedResponse(data, total, page, limit);
+    } catch (error) {
+      this.logger.logFailure('Find all transactions', error as Error);
+      throw error;
+    }
   }
 
-  async findOne(userId: string, id: string) {
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { id },
+  /**
+   * Calcula el balance del usuario (ingresos - gastos)
+   */
+  async getBalance(userId: string) {
+    this.logger.log(`Calculating balance for user ${userId}`);
+
+    try {
+      const [income, expenses] = await Promise.all([
+        this.prisma.transaction.aggregate({
+          where: {
+            userId,
+            type: 'income',
+            deletedAt: null,
+          },
+          _sum: { amount: true },
+        }),
+        this.prisma.transaction.aggregate({
+          where: {
+            userId,
+            type: 'expense',
+            deletedAt: null,
+          },
+          _sum: { amount: true },
+        }),
+      ]);
+
+      const incomeAmount = income._sum.amount ? Number(income._sum.amount) : 0;
+      const expensesAmount = expenses._sum.amount
+        ? Number(expenses._sum.amount)
+        : 0;
+
+      const balance = {
+        income: incomeAmount,
+        expenses: expensesAmount,
+        balance: incomeAmount - expensesAmount,
+      };
+
+      this.logger.logSuccess('Calculate balance', {
+        income: balance.income,
+        expenses: balance.expenses,
+        balance: balance.balance,
+      });
+
+      return balance;
+    } catch (error) {
+      this.logger.logFailure('Calculate balance', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene una transacción por ID
+   */
+  async findOne(id: string, userId: string) {
+    this.logger.log(`Finding transaction ${id} for user ${userId}`);
+
+    const transaction = await this.prisma.transaction.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null,
+      },
       include: {
         category: true,
       },
     });
 
     if (!transaction) {
-      throw new NotFoundException(`Transaction with ID ${id} not found`);
-    }
-
-    if (transaction.userId !== userId) {
-      throw new ForbiddenException(
-        'You do not have access to this transaction',
-      );
-    }
-
-    if (transaction.deletedAt) {
-      throw new NotFoundException(`Transaction with ID ${id} not found`);
+      this.logger.warn(`Transaction ${id} not found for user ${userId}`);
+      throw new NotFoundException('Transaction not found');
     }
 
     return transaction;
   }
 
-  async update(userId: string, id: string, dto: UpdateTransactionDto) {
-    await this.findOne(userId, id);
-
-    const data: {
-      type?: string;
-      amount?: number;
-      currency?: string;
-      description?: string | null;
-      date?: Date;
-      categoryId?: string | null;
-    } = {};
-
-    if (dto.type !== undefined) data.type = dto.type;
-    if (dto.amount !== undefined) data.amount = dto.amount;
-    if (dto.currency !== undefined) data.currency = dto.currency;
-    if (dto.description !== undefined) data.description = dto.description;
-    if (dto.date !== undefined) data.date = new Date(dto.date);
-    if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
-
-    return this.prisma.transaction.update({
-      where: { id },
-      data,
-      include: {
-        category: true,
-      },
+  /**
+   * Actualiza una transacción existente
+   */
+  async update(id: string, dto: UpdateTransactionDto, userId: string) {
+    this.logger.logOperation('Update transaction', {
+      id,
+      updates: dto,
+      userId,
     });
+
+    // Verificar que existe y pertenece al usuario
+    await this.findOne(id, userId);
+
+    try {
+      const transaction = await this.prisma.transaction.update({
+        where: { id },
+        data: dto,
+        include: {
+          category: true,
+        },
+      });
+
+      this.logger.logSuccess('Update transaction', {
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+      });
+
+      return transaction;
+    } catch (error) {
+      this.logger.logFailure('Update transaction', error as Error);
+      throw error;
+    }
   }
 
-  async remove(userId: string, id: string) {
-    await this.findOne(userId, id);
+  /**
+   * Elimina una transacción (soft delete)
+   */
+  async remove(id: string, userId: string) {
+    this.logger.logOperation('Delete transaction', { id, userId });
 
-    return this.prisma.transaction.update({
-      where: { id },
-      data: {
-        deletedAt: new Date(),
-      },
-    });
-  }
+    // Verificar que existe y pertenece al usuario
+    await this.findOne(id, userId);
 
-  async getBalance(userId: string) {
-    const transactions = await this.prisma.transaction.findMany({
-      where: {
-        userId,
-        deletedAt: null,
-      },
-    });
+    try {
+      await this.prisma.transaction.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
 
-    const income = transactions
-      .filter((t) => t.type === 'income')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+      this.logger.logSuccess('Delete transaction', { id });
 
-    const expense = transactions
-      .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    return {
-      income,
-      expense,
-      balance: income - expense,
-      totalTransactions: transactions.length,
-    };
+      return { message: 'Transaction deleted successfully' };
+    } catch (error) {
+      this.logger.logFailure('Delete transaction', error as Error);
+      throw error;
+    }
   }
 }
