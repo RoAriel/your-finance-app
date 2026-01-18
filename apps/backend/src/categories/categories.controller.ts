@@ -10,6 +10,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -69,7 +70,10 @@ export class CategoriesController {
    * @returns Categoría encontrada
    */
   @Get(':id')
-  async findOne(@Param('id') id: string, @CurrentUser('id') userId: string) {
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
     return this.categoriesService.findOne(id, userId);
   }
 
@@ -82,7 +86,7 @@ export class CategoriesController {
    */
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateCategoryDto: UpdateCategoryDto,
     @CurrentUser('id') userId: string,
   ) {
@@ -96,7 +100,10 @@ export class CategoriesController {
    * @returns Mensaje de confirmación
    */
   @Delete(':id')
-  async remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
     return this.categoriesService.remove(id, userId);
   }
 }

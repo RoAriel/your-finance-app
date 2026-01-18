@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -46,21 +47,27 @@ export class TransactionsController {
   }
 
   @Get(':id')
-  findOne(@CurrentUser() user: UserPayload, @Param('id') id: string) {
+  findOne(
+    @CurrentUser() user: UserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.transactionsService.findOne(user.id, id);
   }
 
   @Patch(':id')
   update(
     @CurrentUser() user: UserPayload,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
   ) {
     return this.transactionsService.update(user.id, updateTransactionDto, id);
   }
 
   @Delete(':id')
-  remove(@CurrentUser() user: UserPayload, @Param('id') id: string) {
+  remove(
+    @CurrentUser() user: UserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.transactionsService.remove(user.id, id);
   }
 }
