@@ -19,13 +19,27 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { UserPayload } from '../auth/interfaces/user-payload.interface';
 import { PaginatedResult } from '../common/dto/pagination.dto';
 import { Transaction } from '@prisma/client';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
+@ApiTags('transactions')
+@ApiBearerAuth()
 @Controller('transactions')
 @UseGuards(JwtAuthGuard)
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
+  @ApiOperation({ summary: 'Create a new transaction' })
+  @ApiResponse({
+    status: 201,
+    description: 'The transaction has been successfully created.',
+    type: CreateTransactionDto,
+  })
   create(
     @CurrentUser() user: UserPayload,
     @Body() createTransactionDto: CreateTransactionDto,
