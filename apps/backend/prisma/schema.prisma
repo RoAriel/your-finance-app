@@ -24,6 +24,7 @@ model User {
   // Relaciones
   transactions Transaction[]
   categories   Category[]
+  savingsAccounts SavingsAccount[]
   
   @@map("users")
 }
@@ -80,4 +81,21 @@ model Category {
   @@unique([userId, name, type])
   @@index([userId])
   @@map("categories")
+}
+
+// Agrega este modelo nuevo al final del archivo
+model SavingsAccount {
+  id        String   @id @default(uuid())
+  name      String   // Ej: "Fondo de Emergencia", "Viaje a Japón"
+  currency  String   @default("ARS") // O podrías usar un Enum si quieres ser estricto
+  balance   Decimal  @default(0) @db.Decimal(15, 2) // 15 dígitos total, 2 decimales
+  color     String?  // Hex code para el frontend (ej: #FF5733)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("savings_accounts") // Buena práctica: nombres de tablas en plural/snake_case en la BD
 }
