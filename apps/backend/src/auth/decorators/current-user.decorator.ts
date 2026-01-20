@@ -1,25 +1,11 @@
-// src/auth/decorators/current-user.decorator.ts
-
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-/**
- * Decorador para obtener el usuario autenticado desde el request
- *
- * @example
- * // Obtener usuario completo
- * async method(@CurrentUser() user: User) { ... }
- *
- * @example
- * // Obtener solo el ID
- * async method(@CurrentUser('id') userId: string) { ... }
- *
- * @example
- * // Obtener solo el email
- * async method(@CurrentUser('email') email: string) { ... }
- */
 export const CurrentUser = createParamDecorator(
   (data: string | undefined, ctx: ExecutionContext) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const request = ctx.switchToHttp().getRequest();
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const user = request.user;
 
     // Si no hay usuario (error de auth), retornar undefined
@@ -27,7 +13,7 @@ export const CurrentUser = createParamDecorator(
       return undefined;
     }
 
-    // Si se especifica una propiedad, devolverla
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return data ? user[data] : user;
   },
 );

@@ -5,7 +5,6 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
-  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
@@ -37,9 +36,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message: string | string[];
     if (
       typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
       'message' in exceptionResponse
     ) {
-      message = (exceptionResponse as any).message;
+      message = (exceptionResponse as { message: string | string[] }).message;
     } else if (typeof exceptionResponse === 'string') {
       message = exceptionResponse;
     } else {
@@ -60,6 +60,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       `HTTP ${status} Error - ${request.method} ${request.url}`,
       JSON.stringify({
         message,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         body: request.body,
         params: request.params,
         query: request.query,

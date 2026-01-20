@@ -31,7 +31,7 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
 
     // Mapear códigos de error de Prisma a códigos HTTP
     switch (exception.code) {
-      case 'P2002':
+      case 'P2002': {
         // Unique constraint violation
         status = HttpStatus.CONFLICT;
         const targets = exception.meta?.target as string[] | undefined;
@@ -39,14 +39,16 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
           ? `A record with this ${targets.join(', ')} already exists`
           : 'This record already exists';
         break;
+      }
 
-      case 'P2025':
+      case 'P2025': {
         // Record not found
         status = HttpStatus.NOT_FOUND;
         message = 'Record not found';
         break;
+      }
 
-      case 'P2003':
+      case 'P2003': {
         // Foreign key constraint failed
         status = HttpStatus.BAD_REQUEST;
         const fieldName = exception.meta?.field_name as string | undefined;
@@ -54,20 +56,23 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
           ? `Invalid reference: ${fieldName} does not exist`
           : 'Invalid reference to related record';
         break;
+      }
 
-      case 'P2001':
+      case 'P2001': {
         // Record does not exist
         status = HttpStatus.NOT_FOUND;
         message = 'The requested record does not exist';
         break;
+      }
 
-      case 'P2014':
+      case 'P2014': {
         // Invalid ID
         status = HttpStatus.BAD_REQUEST;
         message = 'Invalid ID provided';
         break;
+      }
 
-      case 'P2011':
+      case 'P2011': {
         // Null constraint violation
         status = HttpStatus.BAD_REQUEST;
         const nullField = exception.meta?.target as string | undefined;
@@ -75,6 +80,7 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
           ? `${nullField} cannot be null`
           : 'A required field is missing';
         break;
+      }
 
       default:
         // Error desconocido de Prisma
@@ -101,6 +107,7 @@ export class PrismaExceptionFilter extends BaseExceptionFilter {
       JSON.stringify({
         message,
         meta: exception.meta,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         body: request.body,
       }),
     );

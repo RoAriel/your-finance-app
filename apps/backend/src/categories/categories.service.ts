@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Category } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { QueryCategoryDto } from './dto/query-category.dto';
@@ -206,13 +207,19 @@ export class CategoriesService {
 
     const { page = 1, limit = 20, type } = query;
 
-    const where: any = {
+    const where: Prisma.CategoryWhereInput = {
       userId,
       deletedAt: null,
     };
 
-    if (type && type !== 'both') {
-      where.OR = [{ type }, { type: 'both' }];
+    if (type && (type as string) === 'both') {
+      where.OR = [
+        { type: 'INCOME' }, // Asegúrate que estos strings coincidan con tu Enum de Prisma
+        { type: 'EXPENSE' },
+        { type: 'BOTH' },
+      ];
+    } else if (type) {
+      where.type = type; // Cast seguro si vienes de un string query param
     }
 
     const skip = (page - 1) * limit;

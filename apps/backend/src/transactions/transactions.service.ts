@@ -1,7 +1,8 @@
 // src/transactions/transactions.service.ts
 
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../..//prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma, Transaction } from '@prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { QueryTransactionDto } from './dto/query-transaction.dto';
@@ -60,7 +61,7 @@ export class TransactionsService {
   async findAll(
     query: QueryTransactionDto,
     userId: string,
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Transaction>> {
     this.logger.log(
       `Finding transactions for user ${userId} with filters: ${JSON.stringify(query)}`,
     );
@@ -76,7 +77,7 @@ export class TransactionsService {
     } = query;
 
     // Construir filtros
-    const where: any = {
+    const where: Prisma.TransactionWhereInput = {
       userId,
       deletedAt: null,
     };
@@ -94,13 +95,18 @@ export class TransactionsService {
     }
 
     if (startDate || endDate) {
-      where.date = {};
+      // Creamos un objeto filtro de fecha TIPADO explícitamente
+      const dateFilter: Prisma.DateTimeFilter = {};
+
       if (startDate) {
-        where.date.gte = new Date(startDate);
+        dateFilter.gte = new Date(startDate);
       }
       if (endDate) {
-        where.date.lte = new Date(endDate);
+        dateFilter.lte = new Date(endDate);
       }
+
+      // Asignamos el filtro completo al where
+      where.date = dateFilter;
     }
 
     // Ejecutar query con paginación
@@ -126,7 +132,7 @@ export class TransactionsService {
         `Found ${data.length} of ${total} transactions for user ${userId}`,
       );
 
-      return createPaginatedResponse(data, total, page, limit);
+      return createPaginatedResponse<Transaction>(data, total, page, limit);
     } catch (error) {
       this.logger.logFailure('Find all transactions', error as Error);
       throw error;
