@@ -1,8 +1,14 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { AppLogger } from '../common/utils/logger.util';
 import { TransactionType } from '../transactions/dto/create-transaction.dto';
+import { UpdateBudgetDto } from './dto/update-budget.dto';
 
 @Injectable()
 export class BudgetsService {
@@ -103,6 +109,67 @@ export class BudgetsService {
 
       this.logger.logSuccess(operation, { count: report.length });
       return report;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  private async findOneAndValidateOwner(id: string, userId: string) {
+    const budget = await this.prisma.budget.findUnique({ where: { id } });
+
+    if (!budget) throw new NotFoundException('Budget not found');
+    if (budget.userId !== userId)
+      throw new ForbiddenException('You do not own this budget');
+
+    return budget;
+  }
+
+  async update(id: string, updateBudgetDto: UpdateBudgetDto, userId: string) {
+    const operation = 'Actualizar Presupuesto';
+
+    try {
+      this.logger.logOperation(operation, { id, ...updateBudgetDto });
+
+      // Validamos que sea suyo antes de tocar nada
+      await this.findOneAndValidateOwner(id, userId);
+
+      const updatedBudget = await this.prisma.budget.update({
+        where: { id },
+        data: updateBudgetDto,
+      });
+
+      this.logger.logSuccess(operation, { id: updatedBudget.id });
+      return updatedBudget;
+    } catch (error: any) {
+      this.logger.logFailure(operation, error);
+
+      // Si intenta cambiar fecha/categoría a una que ya existe
+      if (error.code === 'P2002') {
+        throw new ConflictException(
+          'Ya existe otro presupuesto con esa configuración.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  // 3. Eliminar Presupuesto
+  async remove(id: string, userId: string) {
+    const operation = 'Eliminar Presupuesto';
+
+    try {
+      this.logger.logOperation(operation, { id, userId });
+
+      // Validamos propiedad
+      await this.findOneAndValidateOwner(id, userId);
+
+      await this.prisma.budget.delete({
+        where: { id },
+      });
+
+      this.logger.logSuccess(operation, { id });
+      return { message: 'Budget deleted successfully' };
     } catch (error) {
       this.logger.logFailure(operation, error as Error);
       throw error;
