@@ -1,34 +1,29 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BudgetsService } from './budgets.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
-import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
+@ApiTags('Budgets')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard) // 🔒 Seguridad primero
 @Controller('budgets')
 export class BudgetsController {
   constructor(private readonly budgetsService: BudgetsService) {}
 
   @Post()
-  create(@Body() createBudgetDto: CreateBudgetDto) {
-    return this.budgetsService.create(createBudgetDto);
+  @ApiOperation({ summary: 'Crear un nuevo presupuesto mensual' })
+  create(
+    @Body() createBudgetDto: CreateBudgetDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.budgetsService.create(createBudgetDto, userId);
   }
 
   @Get()
-  findAll() {
-    return this.budgetsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.budgetsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBudgetDto: UpdateBudgetDto) {
-    return this.budgetsService.update(+id, updateBudgetDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.budgetsService.remove(+id);
+  @ApiOperation({ summary: 'Ver reporte de presupuestos (Progreso vs Límite)' })
+  findAll(@CurrentUser('id') userId: string) {
+    return this.budgetsService.findAll(userId);
   }
 }
