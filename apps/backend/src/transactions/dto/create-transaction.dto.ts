@@ -10,9 +10,11 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum TransactionType {
-  INCOME = 'income',
-  EXPENSE = 'expense',
-  BOTH = 'both',
+  INCOME = 'income', // Ingresos externos (Sueldo)
+  EXPENSE = 'expense', // Gastos reales (Comida)
+  BOTH = 'both', // (Para filtros)
+  TRANSFER_IN = 'transfer_in', // Recibir dinero de otra cuenta propia
+  TRANSFER_OUT = 'transfer_out', // Enviar dinero a otra cuenta propia
 }
 
 export class CreateTransactionDto {

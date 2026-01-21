@@ -41,6 +41,7 @@ model Transaction {
   description String?   @db.Text
   date        DateTime  @default(now())
   categoryId  String?   @map("category_id")
+  savingsAccountId String?  // <--- Opcional (porque puede ser un gasto en efectivo)
   
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -49,6 +50,7 @@ model Transaction {
   // Relaciones
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  savingsAccount   SavingsAccount? @relation(fields: [savingsAccountId], references: [id])
   
   // Índices para mejorar performance
   @@index([userId])
@@ -83,7 +85,9 @@ model Category {
   @@map("categories")
 }
 
-// Agrega este modelo nuevo al final del archivo
+// ===========================================
+// SAVINGS ACCOUNT MODEL
+// ===========================================
 model SavingsAccount {
   id        String   @id @default(uuid())
   name      String   // Ej: "Fondo de Emergencia", "Viaje a Japón"
@@ -97,5 +101,9 @@ model SavingsAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  //Relaciones
+  transactions Transaction[] // <--- Una cuenta tiene muchas transacciones
+
+  // Constraints
   @@map("savings_accounts") // Buena práctica: nombres de tablas en plural/snake_case en la BD
 }

@@ -1,4 +1,4 @@
-import { Logger, LogLevel } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 
 export class AppLogger extends Logger {
   /**
