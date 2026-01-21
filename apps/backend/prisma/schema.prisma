@@ -25,6 +25,7 @@ model User {
   transactions Transaction[]
   categories   Category[]
   savingsAccounts SavingsAccount[]
+  budgets Budget[]
   
   @@map("users")
 }
@@ -78,6 +79,7 @@ model Category {
   // Relaciones
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
+  budgets Budget[]
   
   // Constraints
   @@unique([userId, name, type])
@@ -106,4 +108,28 @@ model SavingsAccount {
 
   // Constraints
   @@map("savings_accounts") // Buena práctica: nombres de tablas en plural/snake_case en la BD
+}
+
+// ===========================================
+// BUDGET MODEL
+// ===========================================
+model Budget {
+  id        String   @id @default(uuid())
+  amount    Decimal  @db.Decimal(10, 2) // Límite de gasto
+  month     Int      // 1 al 12
+  year      Int      // 2026, etc.
+
+  // Relaciones
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 🔒 Candado de seguridad: Un solo presupuesto por categoría/mes/año
+  @@unique([userId, categoryId, month, year])
+  @@map("budgets")
 }

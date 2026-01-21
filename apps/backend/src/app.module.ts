@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CategoriesModule } from './categories/categories.module';
 import { SavingsModule } from './savings/savings.module';
+import { BudgetsModule } from './budgets/budgets.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SavingsModule } from './savings/savings.module';
     TransactionsModule,
     CategoriesModule,
     SavingsModule,
+    BudgetsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
