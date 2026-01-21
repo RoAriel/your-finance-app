@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AppLogger } from '../common/utils/logger.util';
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express'; // Necesario para manejar el stream
+import { TransactionType } from '../transactions/dto/create-transaction.dto';
 
 @Injectable()
 export class ReportsService {
@@ -60,6 +61,76 @@ export class ReportsService {
 
       // Importante: No hacemos 'return' porque ya escribimos en 'res'
       res.end();
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+  async getDashboardStats(userId: string) {
+    const operation = 'Obtener Estadísticas Dashboard';
+
+    try {
+      this.logger.logOperation(operation, { userId });
+
+      // 1. Agrupar Gastos por Categoría
+      const expensesByCategory = await this.prisma.transaction.groupBy({
+        by: ['categoryId'],
+        _sum: {
+          amount: true,
+        },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+        },
+      });
+
+      // CORRECCIÓN 1: Filtramos los nulos usando un "Type Guard" (: id is string)
+      // Esto le asegura a TypeScript que el array final es puramente string[]
+      const categoryIds = expensesByCategory
+        .map((e) => e.categoryId)
+        .filter((id): id is string => id !== null);
+
+      const categories = await this.prisma.category.findMany({
+        where: { id: { in: categoryIds } },
+      });
+
+      const chartData = expensesByCategory.map((item) => {
+        const category = categories.find((c) => c.id === item.categoryId);
+        return {
+          categoryName: category?.name || 'Desconocida',
+          total: Number(item._sum.amount),
+          color: category?.color || '#cccccc',
+        };
+      });
+
+      // 4. Totales Generales
+      const totals = await this.prisma.transaction.groupBy({
+        by: ['type'],
+        _sum: { amount: true },
+        where: { userId },
+      });
+
+      // CORRECCIÓN 2: Usamos 'as string' para calmar a ESLint
+      // Comparamos string con string explícitamente
+      const summary = {
+        income: Number(
+          totals.find((t) => t.type === (TransactionType.INCOME as string))
+            ?._sum.amount || 0,
+        ),
+        expense: Number(
+          totals.find((t) => t.type === (TransactionType.EXPENSE as string))
+            ?._sum.amount || 0,
+        ),
+        balance: 0,
+      };
+      summary.balance = summary.income - summary.expense;
+
+      this.logger.logSuccess(operation, { categoriesCount: chartData.length });
+
+      return {
+        summary,
+        chartData,
+      };
     } catch (error) {
       this.logger.logFailure(operation, error as Error);
       throw error;

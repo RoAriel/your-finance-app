@@ -39,4 +39,12 @@ export class ReportsController {
     // 2. Llamamos al servicio pasando el objeto 'res' para que escriba el stream
     await this.reportsService.getTransactionsReport(userId, res);
   }
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Obtener datos resumidos para gráficos (Dashboard)',
+  })
+  async getDashboard(@CurrentUser('id') userId: string) {
+    return this.reportsService.getDashboardStats(userId);
+  }
 }
