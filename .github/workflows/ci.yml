@@ -1,0 +1,47 @@
+name: CI Quality Gate
+
+# 1. ¿Cuándo se ejecuta?
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# 2. ¿Qué va a hacer?
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # Usamos una máquina virtual Linux
+
+    steps:
+    # A. Descargar tu código
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # B. Instalar pnpm (Gestor de paquetes)
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9
+
+    # C. Instalar Node.js
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'pnpm'
+
+    # D. Instalar Dependencias (Backend y Frontend si hubiera)
+    - name: Install Dependencies
+      run: pnpm install --frozen-lockfile
+
+    # E. Verificar Estilo de Código (Linting)
+    # Entramos a la carpeta del backend porque es un monorepo
+    - name: Run Linter (Backend)
+      working-directory: ./apps/backend
+      run: pnpm lint
+
+    # F. Correr Tests Unitarios
+    # OJO: Solo corremos los unitarios que no requieren Base de Datos real
+    - name: Run Unit Tests (Backend)
+      working-directory: ./apps/backend
+      run: pnpm test
