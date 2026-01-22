@@ -69,6 +69,7 @@ model Category {
   userId String  @map("user_id")
   name   String
   type   String  // 'income' | 'expense' | 'both'
+  isFixed   Boolean  @default(false)
   color  String? // Hex color para UI (ej: "#FF5733")
   icon   String? // Nombre del ícono para UI
   

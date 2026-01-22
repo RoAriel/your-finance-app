@@ -75,17 +75,10 @@ export class ReportsService {
       // 1. Agrupar Gastos por Categoría
       const expensesByCategory = await this.prisma.transaction.groupBy({
         by: ['categoryId'],
-        _sum: {
-          amount: true,
-        },
-        where: {
-          userId,
-          type: TransactionType.EXPENSE,
-        },
+        _sum: { amount: true },
+        where: { userId, type: TransactionType.EXPENSE },
       });
 
-      // CORRECCIÓN 1: Filtramos los nulos usando un "Type Guard" (: id is string)
-      // Esto le asegura a TypeScript que el array final es puramente string[]
       const categoryIds = expensesByCategory
         .map((e) => e.categoryId)
         .filter((id): id is string => id !== null);
@@ -103,15 +96,47 @@ export class ReportsService {
         };
       });
 
-      // 4. Totales Generales
+      // 4. Totales Generales (Flujo del mes / histórico de transacciones)
       const totals = await this.prisma.transaction.groupBy({
         by: ['type'],
         _sum: { amount: true },
         where: { userId },
       });
 
-      // CORRECCIÓN 2: Usamos 'as string' para calmar a ESLint
-      // Comparamos string con string explícitamente
+      // 5. NUEVO: Saldo Total Disponible (Patrimonio Real)
+      // Sumamos el campo 'balance' de todas las cuentas de ahorro del usuario
+      const totalWealth = await this.prisma.savingsAccount.aggregate({
+        _sum: { balance: true },
+        where: { userId },
+      });
+
+      // --- Mapeo Final ---
+
+      // Análisis de Fijos vs Variables (que ya probamos)
+      const allCategories = await this.prisma.category.findMany({
+        where: { userId },
+      });
+      const fixedIds = allCategories.filter((c) => c.isFixed).map((c) => c.id);
+
+      const fixedExpenses = await this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          categoryId: { in: fixedIds },
+        },
+      });
+
+      const variableExpenses = await this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          categoryId: { notIn: fixedIds },
+        },
+      });
+
+      // Armamos el objeto de resumen
       const summary = {
         income: Number(
           totals.find((t) => t.type === (TransactionType.INCOME as string))
@@ -121,15 +146,23 @@ export class ReportsService {
           totals.find((t) => t.type === (TransactionType.EXPENSE as string))
             ?._sum.amount || 0,
         ),
-        balance: 0,
+        // Cash Flow (Ingresos - Gastos históricos)
+        cashFlow: 0,
+        // NUEVO: Total Disponible en Cuentas (Lo que tienes en el banco)
+        totalAvailable: Number(totalWealth._sum.balance || 0),
       };
-      summary.balance = summary.income - summary.expense;
+
+      summary.cashFlow = summary.income - summary.expense;
 
       this.logger.logSuccess(operation, { categoriesCount: chartData.length });
 
       return {
-        summary,
+        summary, // Ahora incluye 'totalAvailable'
         chartData,
+        expensesAnalysis: {
+          fixed: Number(fixedExpenses._sum.amount || 0),
+          variable: Number(variableExpenses._sum.amount || 0),
+        },
       };
     } catch (error) {
       this.logger.logFailure(operation, error as Error);

@@ -1,11 +1,13 @@
 import {
   IsString,
   IsEnum,
+  IsBoolean,
   IsOptional,
   MinLength,
   MaxLength,
   Matches,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export enum CategoryType {
   INCOME = 'income',
@@ -33,4 +35,13 @@ export class CreateCategoryDto {
   @IsString()
   @MaxLength(50)
   icon?: string;
+
+  @ApiProperty({
+    description: '¿Es un gasto fijo mensual? (true: Alquiler, false: Cine)',
+    example: true,
+    default: false,
+  })
+  @IsOptional() // Opcional porque tiene default en BD
+  @IsBoolean()
+  isFixed?: boolean;
 }
