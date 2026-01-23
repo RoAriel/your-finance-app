@@ -33,6 +33,10 @@ jobs:
     # D. Instalar Dependencias (Backend y Frontend si hubiera)
     - name: Install Dependencies
       run: pnpm install --frozen-lockfile
+    
+    - name: Generate Prisma Client
+      working-directory: ./apps/backend
+      run: pnpm exec prisma generate
 
     # E. Verificar Estilo de Código (Linting)
     # Entramos a la carpeta del backend porque es un monorepo
