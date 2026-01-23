@@ -57,4 +57,4 @@ async function bootstrap() {
   console.log(`📚 API endpoints available at: http://localhost:${port}/api`);
 }
 
-bootstrap();
+void bootstrap();

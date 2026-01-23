@@ -9,6 +9,7 @@ import { CreateBudgetDto } from './dto/create-budget.dto';
 import { AppLogger } from '../common/utils/logger.util';
 import { TransactionType } from '../transactions/dto/create-transaction.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class BudgetsService {
@@ -35,10 +36,10 @@ export class BudgetsService {
 
       this.logger.logSuccess(operation, { id: budget.id });
       return budget;
-    } catch (error: any) {
-      this.logger.logFailure(operation, error);
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
 
-      if (error.code === 'P2002') {
+      if ((error as Prisma.PrismaClientKnownRequestError).code === 'P2002') {
         throw new ConflictException(
           'Ya existe un presupuesto para esta categoría en ese mes y año.',
         );
@@ -141,11 +142,11 @@ export class BudgetsService {
 
       this.logger.logSuccess(operation, { id: updatedBudget.id });
       return updatedBudget;
-    } catch (error: any) {
-      this.logger.logFailure(operation, error);
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error); // 👈 Fix del log
 
-      // Si intenta cambiar fecha/categoría a una que ya existe
-      if (error.code === 'P2002') {
+      if ((error as Prisma.PrismaClientKnownRequestError).code === 'P2002') {
+        // 👈 Fix del .code
         throw new ConflictException(
           'Ya existe otro presupuesto con esa configuración.',
         );

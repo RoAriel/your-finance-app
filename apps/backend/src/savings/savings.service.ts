@@ -37,7 +37,7 @@ export class SavingsService {
 
       return account;
     } catch (error) {
-      this.logger.logFailure(operation, error);
+      this.logger.logFailure(operation, error as Error);
 
       throw error;
     }
@@ -59,7 +59,7 @@ export class SavingsService {
 
       return accounts;
     } catch (error) {
-      this.logger.logFailure(operation, error);
+      this.logger.logFailure(operation, error as Error);
       throw error;
     }
   }
@@ -86,7 +86,7 @@ export class SavingsService {
       this.logger.logSuccess(operation, { newBalance: updated.balance });
       return updated;
     } catch (error) {
-      this.logger.logFailure(operation, error);
+      this.logger.logFailure(operation, error as Error);
       throw error;
     }
   }
@@ -174,7 +174,7 @@ export class SavingsService {
 
       return result;
     } catch (error) {
-      this.logger.logFailure(operation, error);
+      this.logger.logFailure(operation, error as Error);
       throw error;
     }
   }
