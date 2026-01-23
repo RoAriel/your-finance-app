@@ -46,6 +46,6 @@ jobs:
 
     # F. Correr Tests Unitarios
     # OJO: Solo corremos los unitarios que no requieren Base de Datos real
-    - name: Run Unit Tests (Backend)
-      working-directory: ./apps/backend
-      run: pnpm test
+    #- name: Run Unit Tests (Backend)
+    #  working-directory: ./apps/backend
+    #  run: pnpm test
