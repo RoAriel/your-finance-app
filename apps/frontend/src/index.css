@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  /* Definimos los colores aquí. 
+     Tailwind v4 crea automáticamente las clases como bg-success, text-primary, etc. */
+  
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  
+  --color-success: #10B981;
+  --color-danger: #EF4444;
+  
+  --color-muted: #6B7280;
+  --color-background: #F3F4F6;
+}
