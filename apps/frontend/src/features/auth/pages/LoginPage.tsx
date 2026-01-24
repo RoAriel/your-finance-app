@@ -1,26 +1,29 @@
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { authService } from '../services/auth.service';
 import { logger } from '../../../utils/appLogger';
 import { LogIn } from 'lucide-react'; // Icono bonito
 
+
 export const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await authService.login({ email, password });
-      // Por ahora solo mostramos un alert, luego redirigiremos al Dashboard
-      alert('¡Login Exitoso! Revisa la consola.');
-    } catch (err: any) { // Capturamos error genérico
-      const msg = err.response?.data?.message || 'Error al iniciar sesión';
-      setError(msg);
+    const navigate = useNavigate();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            await authService.login({ email, password });
+            // Por ahora solo mostramos un alert, luego redirigiremos al Dashboard
+            navigate('/dashboard');
+        } catch (err: any) { // Capturamos error genérico
+            const msg = err.response?.data?.message || 'Error al iniciar sesión';
+            setError(msg);
       logger.error('Fallo en login UI', msg);
     } finally {
       setIsLoading(false);
