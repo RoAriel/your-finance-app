@@ -8,6 +8,7 @@ export interface CreateTransactionDTO {
   categoryId: string;
   date: string; // ISO format
   type: 'income' | 'expense' | 'bouth' | 'transfer';
+  currency: string;
 }
 
 export const transactionsService = {

@@ -14,5 +14,6 @@ export const formatDate = (dateString: string) => {
     day: '2-digit',
     month: 'short', // 'ene', 'feb'
     year: 'numeric',
+    timeZone: 'UTC',
   }).format(date);
 };

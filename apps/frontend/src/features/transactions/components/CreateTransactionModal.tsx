@@ -16,6 +16,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
   // 2. Estado del Formulario
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState('ARS');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
   // Fecha de hoy por defecto (formato YYYY-MM-DD para el input type="date")
@@ -40,6 +41,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
         date: new Date(date).toISOString(), // Convertimos a ISO completo
         type,
         categoryId,
+        currency,
       },
       {
         onSuccess: () => {
@@ -56,6 +58,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
     setDescription('');
     setCategoryId('');
     setType('expense');
+    setCurrency('ARS');
   };
 
   if (!isOpen) return null;
@@ -85,7 +88,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
               onClick={() => setType('expense')}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
                 type === 'expense'
-                  ? 'bg-white text-red-600 shadow-sm'
+                  ? 'bg-red-400 text-gray-100 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -96,7 +99,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
               onClick={() => setType('income')}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
                 type === 'income'
-                  ? 'bg-white text-green-600 shadow-sm'
+                  ? 'bg-green-400 text-gray-100 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -105,24 +108,41 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
           </div>
 
           {/* Monto */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Monto
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-2.5 text-gray-500 font-bold">
-                $
-              </span>
-              <input
-                type="number"
-                required
-                min="0.01"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                placeholder="0.00"
-              />
+          <div className="grid grid-cols-3 gap-4">
+            {/* Columna 1: El Monto (Ocupa 2 espacios) */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Monto
+              </label>
+              <div className="relative">
+                {/* Cambiamos el símbolo estático por algo dinámico o lo quitamos */}
+                <input
+                  type="number"
+                  required
+                  min="0.01"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+
+            {/* Columna 2: La Moneda (Ocupa 1 espacio) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Moneda
+              </label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white font-medium text-gray-700"
+              >
+                <option value="ARS">ARS 🇦🇷</option>
+                <option value="USD">USD 🇺🇸</option>
+                <option value="EUR">EUR 🇪🇺</option>
+              </select>
             </div>
           </div>
 
