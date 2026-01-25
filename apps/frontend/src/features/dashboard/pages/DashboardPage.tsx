@@ -11,7 +11,7 @@ export const DashboardPage = () => {
         </p>
         <button
           onClick={() => authService.logout()}
-          className="px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors cursor-pointer font-medium"
+          className="px-4 py-2 bg-danger text-white rounded hover:opacity-90 transition-opacity cursor-pointer font-medium shadow-sm"
         >
           Cerrar Sesión
         </button>

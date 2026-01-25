@@ -2,24 +2,25 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/pages/LoginPage';
 import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
+import { MainLayout } from './layouts/MainLayout';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta Pública: Login */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Rutas Protegidas (Grupo) */}
+        {/* Nivel 1: Seguridad (Si no hay token, no pasa) */}
         <Route element={<ProtectedRoute />}>
-          {/* Si entra a la raíz, redirigir al dashboard */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          
-          <Route path="/dashboard" element={<DashboardPage />} />
-          {/* Aquí agregaremos más rutas: /transactions, /budget, etc. */}
+          {/* Nivel 2: Estructura Visual (Sidebar + Navbar) */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Nivel 3: El contenido real que va en el Outlet */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+          </Route>
         </Route>
 
-        {/* Catch-all: Si escribe cualquier fruta, volver al login */}
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
