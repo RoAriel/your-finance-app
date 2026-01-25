@@ -45,6 +45,7 @@ export class TransactionsController {
     @CurrentUser() user: UserPayload,
     @Body() createTransactionDto: CreateTransactionDto,
   ) {
+    // Este estaba bien: (dto, userId)
     return this.transactionsService.create(createTransactionDto, user.id);
   }
 
@@ -53,11 +54,13 @@ export class TransactionsController {
     @Query() query: QueryTransactionDto,
     @CurrentUser('id') userId: string,
   ): Promise<PaginatedResult<Transaction>> {
+    // Este estaba bien: (query, userId)
     return this.transactionsService.findAll(query, userId);
   }
 
   @Get('balance')
   getBalance(@CurrentUser() user: UserPayload) {
+    // Este estaba bien: (userId)
     return this.transactionsService.getBalance(user.id);
   }
 
@@ -66,7 +69,8 @@ export class TransactionsController {
     @CurrentUser() user: UserPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.transactionsService.findOne(user.id, id);
+    // 🔴 CORREGIDO: Antes era (user.id, id) -> Ahora es (id, user.id)
+    return this.transactionsService.findOne(id, user.id);
   }
 
   @Patch(':id')
@@ -75,7 +79,8 @@ export class TransactionsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateTransactionDto: UpdateTransactionDto,
   ) {
-    return this.transactionsService.update(user.id, updateTransactionDto, id);
+    // 🔴 CORREGIDO: Antes era (user.id, dto, id) -> Ahora es (id, dto, user.id)
+    return this.transactionsService.update(id, updateTransactionDto, user.id);
   }
 
   @Delete(':id')
@@ -83,6 +88,7 @@ export class TransactionsController {
     @CurrentUser() user: UserPayload,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.transactionsService.remove(user.id, id);
+    // 🔴 CORREGIDO: Antes era (user.id, id) -> Ahora es (id, user.id)
+    return this.transactionsService.remove(id, user.id);
   }
 }

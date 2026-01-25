@@ -25,4 +25,9 @@ export const transactionsService = {
     const response = await api.post<Transaction>('/transactions', data);
     return response.data;
   },
+
+  delete: async (id: string) => {
+    // Asumiendo que tu backend usa DELETE /transactions/:id
+    await api.delete(`/transactions/${id}`);
+  },
 };

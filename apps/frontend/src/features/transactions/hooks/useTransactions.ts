@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // <--- Agregamos imports
 import { transactionsService } from '../services/transactions.service';
 import type { CreateTransactionDTO } from '../services/transactions.service';
+import { logger } from '../../../utils/appLogger';
 
 // Clave única para el caché (si cambiamos de página, la clave cambia y refetchea)
 export const useTransactions = (page: number = 1) => {
@@ -28,6 +29,25 @@ export const useCreateTransaction = () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
 
       console.log('Transacción creada y lista actualizada 🔄');
+    },
+  });
+};
+
+export const useDeleteTransaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      transactionsService.delete(transactionId),
+
+    onSuccess: () => {
+      // Invalidamos la lista para que desaparezca el item borrado
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      logger.success('Transacción eliminada correctamente');
+    },
+    onError: (error) => {
+      logger.error('Error al eliminar transacción', error);
+      alert('No se pudo eliminar la transacción');
     },
   });
 };

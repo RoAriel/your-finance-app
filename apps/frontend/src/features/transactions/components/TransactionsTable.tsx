@@ -1,5 +1,7 @@
+import { Trash2 } from 'lucide-react';
 import type { Transaction } from '../types';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
+import { useDeleteTransaction } from '../hooks/useTransactions';
 
 interface Props {
   transactions: Transaction[];
@@ -7,6 +9,13 @@ interface Props {
 
 export const TransactionsTable = ({ transactions }: Props) => {
   // Manejo de estado vacío
+  const deleteMutation = useDeleteTransaction();
+
+  const handleDelete = (id: string) => {
+    if (confirm('¿Estás seguro de querer eliminar esta transacción?')) {
+      deleteMutation.mutate(id);
+    }
+  };
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10 text-gray-500">
@@ -32,6 +41,7 @@ export const TransactionsTable = ({ transactions }: Props) => {
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
               Monto
             </th>
+            <th className="px-6 py-3"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -72,6 +82,17 @@ export const TransactionsTable = ({ transactions }: Props) => {
                   className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${amountColor}`}
                 >
                   {amountSign} {formatCurrency(tx.amount, tx.currency)}
+                </td>
+                {/* 5. NUEVA CELDA DE ACCIONES */}
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button
+                    onClick={() => handleDelete(tx.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer p-1 rounded hover:bg-red-50"
+                    title="Eliminar"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </td>
               </tr>
             );
