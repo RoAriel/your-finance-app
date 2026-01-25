@@ -23,8 +23,8 @@ export const DashboardPage = () => {
         <p className="text-gray-500">Tus últimos movimientos</p>
       </header>
 
-      {/* Aquí insertamos la tabla, pasándole solo el array de 'data' */}
       <section>
+        {/* Pasamos los datos limpios a la tabla */}
         <TransactionsTable transactions={data?.data || []} />
       </section>
     </div>

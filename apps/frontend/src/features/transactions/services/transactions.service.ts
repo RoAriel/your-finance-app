@@ -1,5 +1,14 @@
 import { api } from '../../../lib/axios';
-import type { TransactionsResponse } from '../types';
+import type { TransactionsResponse, Transaction } from '../types';
+
+// Definimos qué datos necesitamos para crear (sin ID, ni fechas, eso lo pone el back)
+export interface CreateTransactionDTO {
+  amount: number;
+  description: string;
+  categoryId: string;
+  date: string; // ISO format
+  type: 'income' | 'expense' | 'bouth' | 'transfer';
+}
 
 export const transactionsService = {
   getAll: async (page = 1, limit = 10) => {
@@ -10,5 +19,10 @@ export const transactionsService = {
 
     return response.data;
     // Esto retorna { data: [...], meta: {...} }
+  },
+
+  create: async (data: CreateTransactionDTO) => {
+    const response = await api.post<Transaction>('/transactions', data);
+    return response.data;
   },
 };
