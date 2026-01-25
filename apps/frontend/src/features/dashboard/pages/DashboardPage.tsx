@@ -1,21 +1,32 @@
-// apps/frontend/src/features/dashboard/pages/DashboardPage.tsx
-import { authService } from '../../auth/services/auth.service';
+import { useTransactions } from '../../transactions/hooks/useTransactions';
+import { TransactionsTable } from '../../transactions/components/TransactionsTable';
 
 export const DashboardPage = () => {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-4">Dashboard</h1>
-      <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
-        <p className="text-gray-600 mb-4">
-          ¡Has ingresado correctamente al área privada! 🎉
-        </p>
-        <button
-          onClick={() => authService.logout()}
-          className="px-4 py-2 bg-danger text-white rounded hover:opacity-90 transition-opacity cursor-pointer font-medium shadow-sm"
-        >
-          Cerrar Sesión
-        </button>
+  const { data, isLoading, error } = useTransactions(1);
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-8 text-red-500">Error cargando datos.</div>;
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold text-gray-800">Resumen Financiero</h1>
+        <p className="text-gray-500">Tus últimos movimientos</p>
+      </header>
+
+      {/* Aquí insertamos la tabla, pasándole solo el array de 'data' */}
+      <section>
+        <TransactionsTable transactions={data?.data || []} />
+      </section>
     </div>
   );
 };
