@@ -11,8 +11,8 @@ export const authService = {
     const response = await api.post<AuthResponse>('/auth/login', credentials);
     
     // Guardamos el token para que el interceptor de Axios lo tome automáticamente
-    if (response.data.access_token) {
-      localStorage.setItem('token', response.data.access_token);
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
       logger.success('Login exitoso. Token guardado.');
     }
 

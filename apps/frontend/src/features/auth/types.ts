@@ -7,7 +7,7 @@ export interface User {
 }
 
 export interface AuthResponse {
-  access_token: string;
+  token: string;
   // Si tu backend devuelve el usuario junto con el token, agrégalo aquí.
   // Si no, tendremos que hacer un fetchUser profile después.
   // Por ahora asumo que solo devuelve el token según tu docs.
