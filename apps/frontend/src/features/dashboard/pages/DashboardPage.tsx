@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'; // Icono bonito
 import { CreateTransactionModal } from '../../transactions/components/CreateTransactionModal'; // <--- Importamos el Modal
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { TransactionsTable } from '../../transactions/components/TransactionsTable';
+import { StatsCards } from './components/StatsCards';
 
 export const DashboardPage = () => {
   const { data, isLoading, error } = useTransactions(1);
@@ -36,7 +37,8 @@ export const DashboardPage = () => {
           Nueva Transacción
         </button>
       </header>
-
+      {/* SECCIÓN DE TARJETAS (Insertar aquí) */}
+      <StatsCards />
       {/* Tabla */}
       <section>
         <TransactionsTable transactions={data?.data || []} />

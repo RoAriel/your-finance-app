@@ -36,3 +36,9 @@ export interface TransactionsResponse {
   data: Transaction[];
   meta: PaginationMeta;
 }
+
+export interface BalanceResponse {
+  income: number;
+  expenses: number;
+  balance: number;
+}

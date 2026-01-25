@@ -1,5 +1,9 @@
 import { api } from '../../../lib/axios';
-import type { TransactionsResponse, Transaction } from '../types';
+import type {
+  TransactionsResponse,
+  Transaction,
+  BalanceResponse,
+} from '../types';
 
 // Definimos qué datos necesitamos para crear (sin ID, ni fechas, eso lo pone el back)
 export interface CreateTransactionDTO {
@@ -30,5 +34,10 @@ export const transactionsService = {
   delete: async (id: string) => {
     // Asumiendo que tu backend usa DELETE /transactions/:id
     await api.delete(`/transactions/${id}`);
+  },
+
+  getBalance: async () => {
+    const response = await api.get<BalanceResponse>('/transactions/balance');
+    return response.data;
   },
 };

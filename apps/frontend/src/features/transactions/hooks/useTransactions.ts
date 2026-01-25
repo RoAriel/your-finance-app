@@ -27,6 +27,7 @@ export const useCreateTransaction = () => {
       // Le decimos al cliente: "Invalida todo lo que empiece por ['transactions']"
       // Esto forzará a useTransactions a hacer un refetch automático.
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
 
       console.log('Transacción creada y lista actualizada 🔄');
     },
@@ -43,11 +44,20 @@ export const useDeleteTransaction = () => {
     onSuccess: () => {
       // Invalidamos la lista para que desaparezca el item borrado
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
       logger.success('Transacción eliminada correctamente');
     },
     onError: (error) => {
       logger.error('Error al eliminar transacción', error);
       alert('No se pudo eliminar la transacción');
     },
+  });
+};
+
+export const useBalance = () => {
+  return useQuery({
+    queryKey: ['balance'],
+    queryFn: transactionsService.getBalance,
+    staleTime: 1000 * 60, // 1 minuto
   });
 };
