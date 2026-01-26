@@ -1,16 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // <--- Agregamos imports
 import { transactionsService } from '../services/transactions.service';
 import { logger } from '../../../utils/appLogger';
-import type { UpdateTransactionDTO, CreateTransactionDTO } from '../types';
+import type {
+  UpdateTransactionDTO,
+  CreateTransactionDTO,
+  TransactionFilters,
+} from '../types';
 
 // Clave única para el caché (si cambiamos de página, la clave cambia y refetchea)
-export const useTransactions = (page: number = 1) => {
+export const useTransactions = (filters?: TransactionFilters) => {
   return useQuery({
-    queryKey: ['transactions', page], // [nombre, dependencia]
-    queryFn: () => transactionsService.getAll(page),
-
-    // Opcional: Mantener los datos viejos mientras cargan los nuevos (mejor UX)
-    placeholderData: (previousData) => previousData,
+    // La 'queryKey' incluye los filtros. Si cambian (ej: mes 1 -> mes 2), React Query refetchea automático.
+    queryKey: ['transactions', filters],
+    queryFn: () => transactionsService.getAll(filters),
   });
 };
 

@@ -5,19 +5,18 @@ import type {
   BalanceResponse,
   CreateTransactionDTO, // <--- Importar
   UpdateTransactionDTO,
+  TransactionFilters,
 } from '../types';
 
 // Definimos qué datos necesitamos para crear (sin ID, ni fechas, eso lo pone el back)
 
 export const transactionsService = {
-  getAll: async (page = 1, limit = 10) => {
+  getAll: async (filters?: TransactionFilters) => {
     // Pasamos los params en la URL para que el backend pagine
     const response = await api.get<TransactionsResponse>('/transactions', {
-      params: { page, limit },
+      params: filters,
     });
-
     return response.data;
-    // Esto retorna { data: [...], meta: {...} }
   },
 
   create: async (data: CreateTransactionDTO) => {

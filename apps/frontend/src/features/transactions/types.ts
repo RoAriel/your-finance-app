@@ -51,6 +51,12 @@ export interface CreateTransactionDTO {
   type: 'income' | 'expense';
   currency: string;
 }
-
+// 6. Filtros para la consulta
+export interface TransactionFilters {
+  month?: number; // 1-12
+  year?: number; // 2026
+  page?: number;
+  limit?: number;
+}
 // Partial hace que todos los campos de Create sean opcionales
 export type UpdateTransactionDTO = Partial<CreateTransactionDTO>;
