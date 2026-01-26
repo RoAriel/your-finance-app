@@ -8,6 +8,7 @@ import { StatsCards } from '../components/StatsCards';
 import { MonthSelector } from '../components/MonthSelector';
 import { useDashboardReport } from '../hooks/useDashboardReport';
 import { ExpensesChart } from '../components/ExpensesChart';
+import { FinancialHealthWidget } from '../components/FinancialHealthWidget';
 import type { Transaction } from '../../transactions/types';
 
 export const DashboardPage = () => {
@@ -79,7 +80,12 @@ export const DashboardPage = () => {
         <div className="lg:col-span-2 space-y-6">
           <StatsCards />
 
-          {/* Aquí irá el futuro Widget de Fijo vs Variable (Módulo 11) */}
+          {reportData?.expensesAnalysis && (
+            <FinancialHealthWidget
+              fixed={reportData.expensesAnalysis.fixed}
+              variable={reportData.expensesAnalysis.variable}
+            />
+          )}
 
           <ExpensesChart
             data={reportData?.chartData || []}

@@ -1,4 +1,10 @@
-import { Trash2, Edit2 } from 'lucide-react';
+import {
+  Edit2,
+  Trash2,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  Lock,
+} from 'lucide-react';
 import type { Transaction } from '../types';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { useDeleteTransaction } from '../hooks/useTransactions';
@@ -70,6 +76,11 @@ export const TransactionsTable = ({ transactions, onEdit }: Props) => {
                     <span className="text-sm font-medium text-gray-900">
                       {tx.category?.name || 'Sin categoría'}
                     </span>
+                    {tx.category?.isFixed && (
+                      <div className="ml-2 text-gray-400" title="Gasto Fijo">
+                        <Lock size={14} />
+                      </div>
+                    )}
                   </div>
                 </td>
 
