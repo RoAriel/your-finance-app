@@ -42,3 +42,15 @@ export interface BalanceResponse {
   expenses: number;
   balance: number;
 }
+
+export interface CreateTransactionDTO {
+  amount: number;
+  description: string;
+  categoryId: string;
+  date: string;
+  type: 'income' | 'expense';
+  currency: string;
+}
+
+// Partial hace que todos los campos de Create sean opcionales
+export type UpdateTransactionDTO = Partial<CreateTransactionDTO>;

@@ -1,76 +1,91 @@
-import { useState } from 'react';
-import { X } from 'lucide-react'; // Icono de cerrar
+import { X } from 'lucide-react';
+import { useState } from 'react'; // Eliminamos useEffect
 import { useCategories } from '../../categories/hooks/useCategories';
-import { useCreateTransaction } from '../hooks/useTransactions';
+import {
+  useCreateTransaction,
+  useUpdateTransaction,
+} from '../hooks/useTransactions';
+import type { Transaction } from '../types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  transactionToEdit?: Transaction | null;
 }
 
-export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
-  // 1. Hooks de datos
+export const CreateTransactionModal = ({
+  isOpen,
+  onClose,
+  transactionToEdit,
+}: Props) => {
   const { data: categories = [] } = useCategories();
+
   const createMutation = useCreateTransaction();
+  const updateMutation = useUpdateTransaction();
+  const isEditing = !!transactionToEdit;
 
-  // 2. Estado del Formulario
-  const [type, setType] = useState<'income' | 'expense'>('expense');
-  const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('ARS');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  // Fecha de hoy por defecto (formato YYYY-MM-DD para el input type="date")
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // 3. Lógica de Filtrado: Solo mostrar categorías que coincidan con el tipo seleccionado
-  const filteredCategories = categories.filter(
-    (cat) => cat.type === type || cat.type === 'both'
+  // ✅ SOLUCIÓN: Inicializamos el estado DIRECTAMENTE con las props.
+  // Como vamos a usar una 'key' en el padre, esto se ejecutará de nuevo cada vez que cambie la transacción.
+  const [type, setType] = useState<Transaction['type']>(
+    transactionToEdit?.type || 'expense'
+  );
+  const [amount, setAmount] = useState(
+    transactionToEdit?.amount?.toString() || ''
+  );
+  const [currency, setCurrency] = useState(
+    transactionToEdit?.currency || 'ARS'
+  );
+  const [description, setDescription] = useState(
+    transactionToEdit?.description || ''
+  );
+  const [categoryId, setCategoryId] = useState(
+    transactionToEdit?.categoryId || ''
   );
 
-  // 4. Manejo del Envío
+  // Manejo seguro de la fecha
+  const initialDate = transactionToEdit?.date
+    ? new Date(transactionToEdit.date).toISOString().split('T')[0]
+    : new Date().toISOString().split('T')[0];
+  const [date, setDate] = useState(initialDate);
+
+  const filteredCategories = categories.filter((c) => c.type === type);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!amount || !categoryId || !description) return;
 
-    // Ejecutamos la mutación
-    createMutation.mutate(
-      {
-        amount: parseFloat(amount), // Convertimos a número
-        description,
-        date: new Date(date).toISOString(), // Convertimos a ISO completo
-        type,
-        categoryId,
-        currency,
-      },
-      {
-        onSuccess: () => {
-          // Si todo sale bien:
-          onClose(); // Cerramos modal
-          resetForm(); // Limpiamos campos
-        },
-      }
-    );
+    const transactionData = {
+      amount: parseFloat(amount),
+      description,
+      date: new Date(date).toISOString(),
+      type: type as 'income' | 'expense',
+      categoryId,
+      currency,
+    };
+
+    const options = { onSuccess: onClose }; // Solo cerramos, el 'key' se encargará de limpiar al reabrir
+
+    if (isEditing && transactionToEdit) {
+      updateMutation.mutate(
+        { id: transactionToEdit.id, data: transactionData },
+        options
+      );
+    } else {
+      createMutation.mutate(transactionData, options);
+    }
   };
 
-  const resetForm = () => {
-    setAmount('');
-    setDescription('');
-    setCategoryId('');
-    setType('expense');
-    setCurrency('ARS');
-  };
+  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   if (!isOpen) return null;
 
   return (
-    // Overlay oscuro (Fondo)
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      {/* Contenedor del Modal */}
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-          <h3 className="font-bold text-lg text-gray-800">Nueva Transacción</h3>
+          <h3 className="font-bold text-lg text-gray-800">
+            {isEditing ? 'Editar Transacción' : 'Nueva Transacción'}
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
@@ -79,57 +94,41 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
           </button>
         </div>
 
-        {/* Body (Formulario) */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Selector de Tipo (Tabs visuales) */}
+          {/* Tabs de Tipo */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
               onClick={() => setType('expense')}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === 'expense'
-                  ? 'bg-red-400 text-gray-100 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Gasto
             </button>
             <button
               type="button"
               onClick={() => setType('income')}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === 'income'
-                  ? 'bg-green-400 text-gray-100 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'income' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Ingreso
             </button>
           </div>
 
-          {/* Monto */}
           <div className="grid grid-cols-3 gap-4">
-            {/* Columna 1: El Monto (Ocupa 2 espacios) */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Monto
               </label>
-              <div className="relative">
-                {/* Cambiamos el símbolo estático por algo dinámico o lo quitamos */}
-                <input
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-                  placeholder="0.00"
-                />
-              </div>
+              <input
+                type="number"
+                required
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                placeholder="0.00"
+              />
             </div>
-
-            {/* Columna 2: La Moneda (Ocupa 1 espacio) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Moneda
@@ -137,7 +136,7 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white font-medium text-gray-700"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white"
               >
                 <option value="ARS">ARS 🇦🇷</option>
                 <option value="USD">USD 🇺🇸</option>
@@ -146,7 +145,6 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
             </div>
           </div>
 
-          {/* Categoría */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoría
@@ -164,14 +162,8 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
                 </option>
               ))}
             </select>
-            {filteredCategories.length === 0 && (
-              <p className="text-xs text-orange-500 mt-1">
-                No hay categorías disponibles para este tipo.
-              </p>
-            )}
           </div>
 
-          {/* Descripción */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Descripción
@@ -182,11 +174,9 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
-              placeholder="Ej: Compras semana, Pago luz..."
             />
           </div>
 
-          {/* Fecha */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha
@@ -200,16 +190,17 @@ export const CreateTransactionModal = ({ isOpen, onClose }: Props) => {
             />
           </div>
 
-          {/* Botón Submit */}
           <div className="pt-2">
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={isLoading}
               className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors"
             >
-              {createMutation.isPending
+              {isLoading
                 ? 'Guardando...'
-                : 'Guardar Transacción'}
+                : isEditing
+                  ? 'Guardar Cambios'
+                  : 'Crear Transacción'}
             </button>
           </div>
         </form>

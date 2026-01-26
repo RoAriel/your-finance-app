@@ -1,13 +1,14 @@
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit2 } from 'lucide-react';
 import type { Transaction } from '../types';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { useDeleteTransaction } from '../hooks/useTransactions';
 
 interface Props {
   transactions: Transaction[];
+  onEdit: (transaction: Transaction) => void;
 }
 
-export const TransactionsTable = ({ transactions }: Props) => {
+export const TransactionsTable = ({ transactions, onEdit }: Props) => {
   // Manejo de estado vacío
   const deleteMutation = useDeleteTransaction();
 
@@ -84,15 +85,28 @@ export const TransactionsTable = ({ transactions }: Props) => {
                   {amountSign} {formatCurrency(tx.amount, tx.currency)}
                 </td>
                 {/* 5. NUEVA CELDA DE ACCIONES */}
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleDelete(tx.id)}
-                    disabled={deleteMutation.isPending}
-                    className="text-gray-400 hover:text-red-600 transition-colors cursor-pointer p-1 rounded hover:bg-red-50"
-                    title="Eliminar"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+
+                {/* Columna de Acciones */}
+                <td className="px-6 py-4 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {/* BOTÓN EDITAR */}
+                    <button
+                      onClick={() => onEdit(tx)}
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+
+                    {/* Botón Borrar (ya existía) */}
+                    <button
+                      onClick={() => handleDelete(tx.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             );

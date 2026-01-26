@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // <--- Agregamos imports
 import { transactionsService } from '../services/transactions.service';
-import type { CreateTransactionDTO } from '../services/transactions.service';
 import { logger } from '../../../utils/appLogger';
+import type { UpdateTransactionDTO, CreateTransactionDTO } from '../types';
 
 // Clave única para el caché (si cambiamos de página, la clave cambia y refetchea)
 export const useTransactions = (page: number = 1) => {
@@ -59,5 +59,19 @@ export const useBalance = () => {
     queryKey: ['balance'],
     queryFn: transactionsService.getBalance,
     staleTime: 1000 * 60, // 1 minuto
+  });
+};
+
+export const useUpdateTransaction = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateTransactionDTO }) =>
+      transactionsService.update(id, data),
+    onSuccess: () => {
+      // Invalidamos para refrescar tabla y balance
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['balance'] });
+    },
   });
 };

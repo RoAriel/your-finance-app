@@ -3,17 +3,11 @@ import type {
   TransactionsResponse,
   Transaction,
   BalanceResponse,
+  CreateTransactionDTO, // <--- Importar
+  UpdateTransactionDTO,
 } from '../types';
 
 // Definimos qué datos necesitamos para crear (sin ID, ni fechas, eso lo pone el back)
-export interface CreateTransactionDTO {
-  amount: number;
-  description: string;
-  categoryId: string;
-  date: string; // ISO format
-  type: 'income' | 'expense' | 'bouth' | 'transfer';
-  currency: string;
-}
 
 export const transactionsService = {
   getAll: async (page = 1, limit = 10) => {
@@ -38,6 +32,11 @@ export const transactionsService = {
 
   getBalance: async () => {
     const response = await api.get<BalanceResponse>('/transactions/balance');
+    return response.data;
+  },
+
+  update: async (id: string, data: UpdateTransactionDTO) => {
+    const response = await api.patch<Transaction>(`/transactions/${id}`, data);
     return response.data;
   },
 };
