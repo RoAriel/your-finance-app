@@ -4,6 +4,7 @@ import { useCategories } from '../hooks/useCategories';
 import { CategoryCard } from '../components/CategoryCard';
 import { CategoryModal } from '../components/CategoryModal';
 import type { Category } from '../types';
+import type { PaginatedResponse } from '../../../types';
 import { useConfirm } from '../../../context/ConfirmContext';
 
 export const CategoriesPage = () => {
@@ -12,8 +13,8 @@ export const CategoriesPage = () => {
 
   // Lógica segura para leer datos (Array o Objeto paginado)
   const categories = Array.isArray(rawData)
-    ? rawData
-    : (rawData as any)?.data || [];
+    ? (rawData as Category[])
+    : (rawData as unknown as PaginatedResponse<Category>)?.data || [];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -44,7 +45,7 @@ export const CategoriesPage = () => {
     });
   };
 
-  const filteredCategories = categories.filter((c: any) =>
+  const filteredCategories = categories.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

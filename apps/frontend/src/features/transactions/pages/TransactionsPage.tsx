@@ -6,11 +6,11 @@ import { TransactionsTable } from '../components/TransactionsTable';
 import { CreateTransactionModal } from '../components/CreateTransactionModal';
 import type { Transaction } from '../types';
 import { useConfirm } from '../../../context/ConfirmContext'; // Hook Global
+import type { PaginatedResponse } from '../../../types';
 
 export const TransactionsPage = () => {
   const {
     data: rawData, // 1. Renombramos 'data' (que sí existe) a 'rawData'
-    isLoading,
     deleteTransaction,
     filters,
     setFilters,
@@ -19,8 +19,8 @@ export const TransactionsPage = () => {
   const { confirm } = useConfirm();
 
   const transactions = Array.isArray(rawData)
-    ? rawData
-    : (rawData as any)?.data || [];
+    ? (rawData as Transaction[])
+    : (rawData as PaginatedResponse<Transaction>)?.data || [];
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =

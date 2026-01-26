@@ -6,6 +6,8 @@ import {
   useUpdateTransaction,
 } from '../hooks/useTransactions';
 import type { Transaction } from '../types';
+import type { PaginatedResponse } from '../../../types';
+import type { Category } from '../../categories/types';
 
 interface Props {
   isOpen: boolean;
@@ -28,8 +30,8 @@ export const CreateTransactionModal = ({
 
   // Blindaje de datos: Aseguramos que sea array
   const categories = Array.isArray(rawData)
-    ? rawData
-    : (rawData as any)?.data || [];
+    ? (rawData as Category[])
+    : (rawData as unknown as PaginatedResponse<Category>)?.data || [];
 
   const [type, setType] = useState<Transaction['type']>(
     transactionToEdit?.type || 'expense'
@@ -55,7 +57,7 @@ export const CreateTransactionModal = ({
 
   // Incluimos categorías del tipo seleccionado O las que son 'both' (ambos)
   const filteredCategories = categories.filter(
-    (c: any) => c.type === type || c.type === 'both'
+    (c) => c.type === type || c.type === 'both'
   );
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { X, Lock, Check, HelpCircle, AlertCircle } from 'lucide-react'; // ✅ Agregado AlertCircle
+import { X, Lock, Check, HelpCircle, AlertCircle } from 'lucide-react';
 import type { Category, CreateCategoryDTO } from '../types';
 import { CategoryType } from '../types';
 import { useCategories } from '../hooks/useCategories';
 import { CATEGORY_COLORS, AVAILABLE_ICONS, ICON_MAP } from '../constants';
+import axios from 'axios';
 
 interface Props {
   isOpen: boolean;
@@ -15,7 +16,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   const { createCategory, updateCategory, isCreating, isUpdating } =
     useCategories();
 
-  // ✅ INICIALIZACIÓN DIRECTA
+  // Inicialización directa de estados
   const [name, setName] = useState(categoryToEdit?.name || '');
   const [type, setType] = useState<CategoryType>(
     categoryToEdit?.type || CategoryType.EXPENSE
@@ -26,15 +27,15 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   );
   const [icon, setIcon] = useState(categoryToEdit?.icon || AVAILABLE_ICONS[0]);
 
-  // Estado para el error
+  // Estado para el error visual
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ RESOLUCIÓN DE ICONO SEGURA
+  // Resolución segura de icono
   const IconSelected = ICON_MAP[icon] || HelpCircle;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null); // Limpiamos errores previos al intentar de nuevo
+    setError(null); // Limpiamos errores previos
 
     const data: CreateCategoryDTO = { name, type, isFixed, color, icon };
 
@@ -44,20 +45,22 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
       } else {
         await createCategory(data);
       }
-      onClose(); // Solo cerramos si tuvo éxito
-    } catch (err: any) {
-      console.error('Error saving category', err);
+      onClose(); // Si todo sale bien, cerramos
+    } catch (err: unknown) {
+      // 🟢 AQUÍ FALTABA ESTA LÍNEA
+      console.error('Error saving category', err); // Para el desarrollador (F12)
 
-      // ✅ LOGICA DE ERROR ROBUSTA:
-      // Capturamos el mensaje que viene de NestJS/Axios
-      const backendMessage = err.response?.data?.message;
+      let backendMessage = 'Ocurrió un error al guardar la categoría.';
 
-      // Si es un array (validaciones múltiples), tomamos el primero. Si no, el mensaje directo.
-      const finalMessage = Array.isArray(backendMessage)
-        ? backendMessage[0]
-        : backendMessage || 'Ocurrió un error al guardar la categoría.';
+      // Verificamos si es un error de Axios para mostrar el mensaje real del backend
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const data = err.response.data as { message: string | string[] };
+        backendMessage = Array.isArray(data.message)
+          ? data.message[0]
+          : data.message;
+      }
 
-      setError(finalMessage);
+      setError(backendMessage); // 🟢 Esto actualiza la UI visualmente para el usuario
     }
   };
 
@@ -81,9 +84,9 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
           </button>
         </div>
 
-        {/* Scrollable Content */}
+        {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-          {/* ✅ NUEVO: Alerta de Error Visual */}
+          {/* 🔴 Aquí se muestra el error visualmente al usuario */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 text-sm animate-in slide-in-from-top-2">
               <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -91,7 +94,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           )}
 
-          {/* Nombre y Tipo */}
+          {/* Formulario */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -102,9 +105,8 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  if (error) setError(null); // UX: Borrar error cuando el usuario escribe
+                  if (error) setError(null); // Borramos el error al escribir
                 }}
-                // ✅ Estilos condicionales: Borde rojo si hay error
                 className={`w-full px-4 py-2 border rounded-lg outline-none transition-all ${
                   error
                     ? 'border-red-300 focus:ring-red-200'
@@ -178,7 +180,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           </div>
 
-          {/* Selector de COLOR */}
+          {/* Color Picker */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               Color
@@ -200,17 +202,14 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           </div>
 
-          {/* Selector de ICONO */}
+          {/* Icon Picker */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <label className="block text-sm font-medium text-gray-700">
                 Icono
               </label>
-
-              {/* Vista previa del icono */}
               <div
                 className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center shadow-sm"
-                title="Icono seleccionado actual"
                 style={{ backgroundColor: color }}
               >
                 <IconSelected size={14} />
@@ -239,7 +238,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
           </div>
         </div>
 
-        {/* Footer Actions */}
+        {/* Footer */}
         <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex gap-3">
           <button
             onClick={onClose}

@@ -1,4 +1,4 @@
-import { AlertTriangle, Info, X } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 export type ConfirmVariant = 'danger' | 'info';
 
@@ -30,7 +30,7 @@ export const ConfirmationModal = ({
   const isDanger = variant === 'danger';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden transform transition-all scale-100">
         <div className="flex flex-col items-center p-6 text-center">
           <div
