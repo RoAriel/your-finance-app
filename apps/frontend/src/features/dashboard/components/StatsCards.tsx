@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Wallet } from 'lucide-react';
-import { useBalance } from '../../../transactions/hooks/useTransactions';
-import { formatCurrency } from '../../../../utils/formatters';
+import { useBalance } from '../../transactions/hooks/useTransactions';
+import { formatCurrency } from '../../../utils/formatters';
 
 export const StatsCards = () => {
   const { data, isLoading } = useBalance();

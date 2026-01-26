@@ -72,11 +72,15 @@ export class ReportsService {
     try {
       this.logger.logOperation(operation, { userId });
 
-      // 1. Agrupar Gastos por Categoría
+      // 1. Agrupar Gastos por Categoría (SOLO ACTIVOS)
       const expensesByCategory = await this.prisma.transaction.groupBy({
         by: ['categoryId'],
         _sum: { amount: true },
-        where: { userId, type: TransactionType.EXPENSE },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          deletedAt: null, // 👈 IMPORTANTE: Ignorar los borrados
+        },
       });
 
       const categoryIds = expensesByCategory
@@ -96,47 +100,50 @@ export class ReportsService {
         };
       });
 
-      // 4. Totales Generales (Flujo del mes / histórico de transacciones)
+      // 4. Totales Generales (SOLO ACTIVOS)
       const totals = await this.prisma.transaction.groupBy({
         by: ['type'],
         _sum: { amount: true },
-        where: { userId },
+        where: {
+          userId,
+          deletedAt: null, // 👈 IMPORTANTE
+        },
       });
 
-      // 5. NUEVO: Saldo Total Disponible (Patrimonio Real)
-      // Sumamos el campo 'balance' de todas las cuentas de ahorro del usuario
       const totalWealth = await this.prisma.savingsAccount.aggregate({
         _sum: { balance: true },
         where: { userId },
+        // Nota: Las cuentas usualmente no tienen soft-delete, pero si lo tuvieran, agrégalo aquí también.
       });
 
-      // --- Mapeo Final ---
-
-      // Análisis de Fijos vs Variables (que ya probamos)
+      // Análisis de Fijos vs Variables
       const allCategories = await this.prisma.category.findMany({
         where: { userId },
       });
       const fixedIds = allCategories.filter((c) => c.isFixed).map((c) => c.id);
 
+      // 5. Gastos Fijos (SOLO ACTIVOS)
       const fixedExpenses = await this.prisma.transaction.aggregate({
         _sum: { amount: true },
         where: {
           userId,
           type: TransactionType.EXPENSE,
           categoryId: { in: fixedIds },
+          deletedAt: null, // 👈 IMPORTANTE
         },
       });
 
+      // 6. Gastos Variables (SOLO ACTIVOS)
       const variableExpenses = await this.prisma.transaction.aggregate({
         _sum: { amount: true },
         where: {
           userId,
           type: TransactionType.EXPENSE,
           categoryId: { notIn: fixedIds },
+          deletedAt: null, // 👈 IMPORTANTE
         },
       });
 
-      // Armamos el objeto de resumen
       const summary = {
         income: Number(
           totals.find((t) => t.type === (TransactionType.INCOME as string))
@@ -146,9 +153,7 @@ export class ReportsService {
           totals.find((t) => t.type === (TransactionType.EXPENSE as string))
             ?._sum.amount || 0,
         ),
-        // Cash Flow (Ingresos - Gastos históricos)
         cashFlow: 0,
-        // NUEVO: Total Disponible en Cuentas (Lo que tienes en el banco)
         totalAvailable: Number(totalWealth._sum.balance || 0),
       };
 
@@ -157,7 +162,7 @@ export class ReportsService {
       this.logger.logSuccess(operation, { categoriesCount: chartData.length });
 
       return {
-        summary, // Ahora incluye 'totalAvailable'
+        summary,
         chartData,
         expensesAnalysis: {
           fixed: Number(fixedExpenses._sum.amount || 0),

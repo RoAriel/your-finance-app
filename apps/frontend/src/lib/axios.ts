@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import type {InternalAxiosRequestConfig} from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 import { logger } from '../utils/appLogger';
 
 // 1. Crear instancia base
@@ -9,7 +9,7 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   // Timeout de 10 segundos para no dejar la UI colgada eternamente
-  timeout: 10000, 
+  timeout: 30000,
 });
 
 // 2. Interceptor de REQUEST (Salida)
@@ -17,8 +17,8 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // Aquí recuperaremos el token (más adelante lo conectaremos con AuthStore)
-    const token = localStorage.getItem('token'); 
-    
+    const token = localStorage.getItem('token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -50,14 +50,19 @@ api.interceptors.response.use(
       logger.error(`❌ API Error [${status}]`, data);
 
       if (status === 401) {
-        logger.warn('Sesión expirada o token inválido. Redirigiendo a login...');
+        logger.warn(
+          'Sesión expirada o token inválido. Redirigiendo a login...'
+        );
         // TODO: Aquí dispararemos el logout automático más adelante
         // localStorage.removeItem('token');
         // window.location.href = '/login';
       }
     } else if (error.request) {
       // La petición se hizo pero no hubo respuesta (Backend caído o sin internet)
-      logger.error('Sin respuesta del servidor. Verifica tu conexión.', error.request);
+      logger.error(
+        'Sin respuesta del servidor. Verifica tu conexión.',
+        error.request
+      );
     } else {
       logger.error('Error desconocido', error.message);
     }

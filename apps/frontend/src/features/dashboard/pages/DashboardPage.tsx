@@ -3,35 +3,49 @@ import { Plus } from 'lucide-react';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { TransactionsTable } from '../../transactions/components/TransactionsTable';
 import { CreateTransactionModal } from '../../transactions/components/CreateTransactionModal';
-import { StatsCards } from './components/StatsCards';
-import { MonthSelector } from './components/MonthSelector';
+import { StatsCards } from '../components/StatsCards';
+import { MonthSelector } from '../components/MonthSelector';
 import { Pagination } from '../../../components/ui/Pagination';
 import type { Transaction } from '../../transactions/types';
+import { useDashboardReport } from '../hooks/useDashboardReport';
+import { ExpensesChart } from '../components/ExpensesChart';
 
 export const DashboardPage = () => {
-  // 1. Estado de la Fecha Actual (Por defecto: Hoy)
+  // 1. Estado de la Fecha Actual y Paginación
   const [currentDate, setCurrentDate] = useState(new Date());
-
   const [page, setPage] = useState(1);
 
-  // 2. Calculamos los filtros basados en la fecha seleccionada
+  // 2. DEFINIR FILTROS (Importante: Definir esto ANTES de usarlo en los hooks)
   const filters = {
     month: currentDate.getMonth() + 1,
     year: currentDate.getFullYear(),
-    page, // <--- Dinámico
-    limit: 10, // <--- Más ligero (muestra de a 10)
   };
 
-  // 3. Pasamos los filtros al hook. ¡Magia! React Query recargará al cambiar filters.
-  const { data, isLoading } = useTransactions(filters);
-  const meta = data?.meta;
+  // 3. Hook para la TABLA (Con paginación)
+  const { data: transactionsData, isLoading: isLoadingTransactions } =
+    useTransactions({
+      ...filters, // Pasa mes y año
+      page, // Pasa página actual
+      limit: 10, // Límite por página
+    });
 
+  // 4. Hook para el REPORTE (Gráficos y Totales del mes completo)
+  const { data: reportData, isLoading: isLoadingReport } =
+    useDashboardReport(filters);
+
+  // 🕵️‍♂️ AGREGA ESTO TEMPORALMENTE:
+  console.log('--- DEBUG DASHBOARD ---');
+  console.log('Filtros enviados:', filters);
+  console.log('Datos recibidos (Reporte):', reportData);
+  console.log('Chart Data:', reportData?.chartData);
+
+  // Resetear a página 1 si cambiamos de mes
   const handleDateChange = (newDate: Date) => {
     setCurrentDate(newDate);
     setPage(1);
   };
 
-  // Estados del Modal (ya los tenías)
+  // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
@@ -58,7 +72,6 @@ export const DashboardPage = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Componente Nuevo */}
           <MonthSelector
             currentDate={currentDate}
             onChange={handleDateChange}
@@ -74,37 +87,44 @@ export const DashboardPage = () => {
         </div>
       </div>
 
-      {/* StatsCards (Nota: Estas deberían filtrarse también, pero por ahora muestran el global o lo que devuelva el endpoint) */}
-      <StatsCards />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna Izquierda: Stats y Tabla (2/3 del ancho) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* TODO: Más adelante pasaremos reportData?.summary a las StatsCards */}
+          <StatsCards />
 
-      {/* Tabla */}
-      <section className="bg-white rounded-xl shadow-sm border border-gray-100">
-        {/* Nota: Moví el borde/shadow al contenedor section para envolver tabla + paginación */}
+          {/* TABLA DE TRANSACCIONES */}
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
+            <div className="p-4 border-b border-gray-100 font-bold text-gray-700">
+              Últimos Movimientos
+            </div>
 
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <>
             <TransactionsTable
-              transactions={data?.data || []}
+              transactions={transactionsData?.data || []}
               onEdit={handleOpenEdit}
             />
 
-            {/* 3. COMPONENTE DE PAGINACIÓN */}
-            {meta && (
+            {/* Paginación solo si hay metadata */}
+            {transactionsData?.meta && (
               <Pagination
-                page={meta.page}
-                totalPages={meta.totalPages}
-                hasPreviousPage={meta.hasPreviousPage}
-                hasNextPage={meta.hasNextPage}
+                page={transactionsData.meta.page}
+                totalPages={transactionsData.meta.totalPages}
+                hasPreviousPage={transactionsData.meta.hasPreviousPage}
+                hasNextPage={transactionsData.meta.hasNextPage}
                 onPageChange={setPage}
               />
             )}
-          </>
-        )}
-      </section>
+          </section>
+        </div>
+
+        {/* Columna Derecha: Gráfico (1/3 del ancho) */}
+        <div className="lg:col-span-1">
+          <ExpensesChart
+            data={reportData?.chartData || []}
+            isLoading={isLoadingReport}
+          />
+        </div>
+      </div>
 
       <CreateTransactionModal
         key={isModalOpen ? editingTransaction?.id || 'new' : 'closed'}
