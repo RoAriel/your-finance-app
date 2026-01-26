@@ -3,6 +3,7 @@ import { LoginPage } from './features/auth/pages/LoginPage';
 import { DashboardPage } from './features/dashboard/pages/DashboardPage';
 import { TransactionsPage } from './features/transactions/pages/TransactionsPage';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
+import { CategoriesPage } from './features/categories/pages/CategoriesPage';
 import { MainLayout } from './layouts/MainLayout';
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/categories" element={<CategoriesPage />} />
 
             {/* Rutas Hijas */}
             <Route path="/dashboard" element={<DashboardPage />} />

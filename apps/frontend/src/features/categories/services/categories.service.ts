@@ -1,14 +1,23 @@
 import { api } from '../../../lib/axios';
-import type { CategoriesResponse } from '../types';
+import type { Category, CreateCategoryDTO, UpdateCategoryDTO } from '../types';
 
 export const categoriesService = {
   getAll: async () => {
-    // Pedimos 100 para asegurar que vengan todas en la primera página
-    const response = await api.get<CategoriesResponse>('/categories', {
-      params: { limit: 100 },
-    });
+    const response = await api.get<Category[]>('/categories');
+    return response.data;
+  },
 
-    // Retornamos directamente el array 'data', que es lo que le importa al Dropdown
-    return response.data.data;
+  create: async (data: CreateCategoryDTO) => {
+    const response = await api.post<Category>('/categories', data);
+    return response.data;
+  },
+
+  update: async (id: string, data: UpdateCategoryDTO) => {
+    const response = await api.patch<Category>(`/categories/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/categories/${id}`);
   },
 };

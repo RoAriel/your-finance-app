@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, LogOut } from 'lucide-react';
+import { LayoutDashboard, ListTodo, LogOut, Tags } from 'lucide-react';
 
 export const Sidebar = () => {
   const navLinks = [
@@ -9,6 +9,7 @@ export const Sidebar = () => {
       icon: <LayoutDashboard size={20} />,
     },
     { to: '/transactions', text: 'Movimientos', icon: <ListTodo size={20} /> },
+    { to: '/categories', text: 'Categorías', icon: <Tags size={20} /> },
   ];
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full md:flex">

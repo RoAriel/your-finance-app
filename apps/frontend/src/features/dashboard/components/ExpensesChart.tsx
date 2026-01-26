@@ -32,7 +32,7 @@ export const ExpensesChart = ({ data, isLoading }: Props) => {
   }
 
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col h-[400px]">
+    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm flex flex-col h-100">
       <h3 className="text-lg font-bold text-gray-800 mb-4">
         Distribución de Gastos
       </h3>

@@ -18,14 +18,18 @@ export const CreateTransactionModal = ({
   onClose,
   transactionToEdit,
 }: Props) => {
-  const { data: categories = [] } = useCategories();
-
   const createMutation = useCreateTransaction();
   const updateMutation = useUpdateTransaction();
   const isEditing = !!transactionToEdit;
 
-  // ✅ SOLUCIÓN: Inicializamos el estado DIRECTAMENTE con las props.
-  // Como vamos a usar una 'key' en el padre, esto se ejecutará de nuevo cada vez que cambie la transacción.
+  const isLoading = createMutation.isPending || updateMutation.isPending;
+
+  const { data: rawData } = useCategories();
+
+  const categories = Array.isArray(rawData)
+    ? rawData
+    : (rawData as any)?.data || [];
+
   const [type, setType] = useState<Transaction['type']>(
     transactionToEdit?.type || 'expense'
   );
@@ -48,7 +52,9 @@ export const CreateTransactionModal = ({
     : new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(initialDate);
 
-  const filteredCategories = categories.filter((c) => c.type === type);
+  const filteredCategories = categories.filter(
+    (c: any) => c.type === type || c.type === 'both'
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,8 +80,6 @@ export const CreateTransactionModal = ({
       createMutation.mutate(transactionData, options);
     }
   };
-
-  const isLoading = createMutation.isPending || updateMutation.isPending;
 
   if (!isOpen) return null;
 
