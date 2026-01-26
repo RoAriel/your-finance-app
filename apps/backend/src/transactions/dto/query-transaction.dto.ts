@@ -1,5 +1,15 @@
-import { IsOptional, IsEnum, IsDateString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsDateString,
+  IsUUID,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export enum TransactionType {
   INCOME = 'income',
@@ -32,4 +42,19 @@ export class QueryTransactionDto extends PaginationDto {
   @IsOptional()
   @IsEnum(Currency)
   currency?: Currency;
+
+  @ApiPropertyOptional({ description: 'Mes para filtrar (1-12)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month?: number;
+
+  @ApiPropertyOptional({ description: 'Año para filtrar (ej: 2026)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  year?: number;
 }

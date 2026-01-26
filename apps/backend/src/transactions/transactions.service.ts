@@ -74,6 +74,8 @@ export class TransactionsService {
       endDate,
       categoryId,
       currency,
+      year,
+      month,
     } = query;
 
     // Construir filtros
@@ -94,19 +96,20 @@ export class TransactionsService {
       where.currency = currency;
     }
 
-    if (startDate || endDate) {
-      // Creamos un objeto filtro de fecha TIPADO explícitamente
-      const dateFilter: Prisma.DateTimeFilter = {};
+    let filterStart = startDate ? new Date(startDate) : undefined;
+    let filterEnd = endDate ? new Date(endDate) : undefined;
 
-      if (startDate) {
-        dateFilter.gte = new Date(startDate);
-      }
-      if (endDate) {
-        dateFilter.lte = new Date(endDate);
-      }
+    // Si no hay fechas explícitas pero sí hay Mes/Año, calculamos el rango
+    if (!filterStart && !filterEnd && month && year) {
+      filterStart = new Date(year, month - 1, 1);
+      filterEnd = new Date(year, month, 0, 23, 59, 59, 999);
+    }
 
-      // Asignamos el filtro completo al where
-      where.date = dateFilter;
+    // Aplicamos el filtro si tenemos alguna fecha calculada
+    if (filterStart || filterEnd) {
+      where.date = {};
+      if (filterStart) where.date.gte = filterStart;
+      if (filterEnd) where.date.lte = filterEnd;
     }
 
     // Ejecutar query con paginación
