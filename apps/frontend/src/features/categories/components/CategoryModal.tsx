@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Lock, Check, HelpCircle } from 'lucide-react'; // Importamos HelpCircle por seguridad
+import { X, Lock, Check, HelpCircle, AlertCircle } from 'lucide-react'; // ✅ Agregado AlertCircle
 import type { Category, CreateCategoryDTO } from '../types';
 import { CategoryType } from '../types';
 import { useCategories } from '../hooks/useCategories';
@@ -15,9 +15,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   const { createCategory, updateCategory, isCreating, isUpdating } =
     useCategories();
 
-  // ✅ 1. INICIALIZACIÓN DIRECTA (Sin useEffect)
-  // Como el padre usa una 'key' única, estos estados se reinician solos cada vez que abres el modal.
-  // ¡Adiós al warning de setState dentro de useEffect!
+  // ✅ INICIALIZACIÓN DIRECTA
   const [name, setName] = useState(categoryToEdit?.name || '');
   const [type, setType] = useState<CategoryType>(
     categoryToEdit?.type || CategoryType.EXPENSE
@@ -28,12 +26,16 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   );
   const [icon, setIcon] = useState(categoryToEdit?.icon || AVAILABLE_ICONS[0]);
 
-  // ✅ 2. RESOLUCIÓN DE ICONO SEGURA
-  // Si el icono no existe, usamos HelpCircle. Esto evita crashes.
+  // Estado para el error
+  const [error, setError] = useState<string | null>(null);
+
+  // ✅ RESOLUCIÓN DE ICONO SEGURA
   const IconSelected = ICON_MAP[icon] || HelpCircle;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null); // Limpiamos errores previos al intentar de nuevo
+
     const data: CreateCategoryDTO = { name, type, isFixed, color, icon };
 
     try {
@@ -42,9 +44,20 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
       } else {
         await createCategory(data);
       }
-      onClose();
-    } catch (error) {
-      console.error('Error saving category', error);
+      onClose(); // Solo cerramos si tuvo éxito
+    } catch (err: any) {
+      console.error('Error saving category', err);
+
+      // ✅ LOGICA DE ERROR ROBUSTA:
+      // Capturamos el mensaje que viene de NestJS/Axios
+      const backendMessage = err.response?.data?.message;
+
+      // Si es un array (validaciones múltiples), tomamos el primero. Si no, el mensaje directo.
+      const finalMessage = Array.isArray(backendMessage)
+        ? backendMessage[0]
+        : backendMessage || 'Ocurrió un error al guardar la categoría.';
+
+      setError(finalMessage);
     }
   };
 
@@ -70,6 +83,14 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
 
         {/* Scrollable Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+          {/* ✅ NUEVO: Alerta de Error Visual */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 text-sm animate-in slide-in-from-top-2">
+              <AlertCircle size={18} className="shrink-0 mt-0.5" />
+              <p>{error}</p>
+            </div>
+          )}
+
           {/* Nombre y Tipo */}
           <div className="space-y-4">
             <div>
@@ -79,8 +100,16 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError(null); // UX: Borrar error cuando el usuario escribe
+                }}
+                // ✅ Estilos condicionales: Borde rojo si hay error
+                className={`w-full px-4 py-2 border rounded-lg outline-none transition-all ${
+                  error
+                    ? 'border-red-300 focus:ring-red-200'
+                    : 'border-gray-200 focus:ring-primary/20 focus:border-primary'
+                }`}
                 placeholder="Ej: Gimnasio"
                 autoFocus
               />
@@ -178,11 +207,11 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
                 Icono
               </label>
 
-              {/* ✅ 3. AQUÍ USAMOS LA VARIABLE: Vista previa del icono */}
+              {/* Vista previa del icono */}
               <div
                 className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center shadow-sm"
                 title="Icono seleccionado actual"
-                style={{ backgroundColor: color }} // Truco extra: le ponemos el color seleccionado
+                style={{ backgroundColor: color }}
               >
                 <IconSelected size={14} />
               </div>

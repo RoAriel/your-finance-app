@@ -1,4 +1,5 @@
 import {
+  IsString,
   IsEnum,
   IsDateString,
   IsUUID,
@@ -23,6 +24,11 @@ export enum Currency {
 }
 
 export class QueryTransactionDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Buscar por descripción' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @IsOptional()
   @IsEnum(TransactionType)
   type?: TransactionType;

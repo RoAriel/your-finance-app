@@ -4,25 +4,19 @@ import { useCategories } from '../hooks/useCategories';
 import { CategoryCard } from '../components/CategoryCard';
 import { CategoryModal } from '../components/CategoryModal';
 import type { Category } from '../types';
+import { useConfirm } from '../../../context/ConfirmContext';
 
 export const CategoriesPage = () => {
-  // 🔴 CAMBIO CLAVE AQUÍ:
-  // 1. Recibimos 'rawData' (que puede ser cualquier cosa)
-  const { data: rawData, isLoading } = useCategories();
+  const { data: rawData, isLoading, deleteCategory } = useCategories();
+  const { confirm } = useConfirm(); // Hook del Modal Global
 
-  // 2. BLINDAJE: Extraemos el array real, venga como venga.
-  // Si es array -> lo usamos.
-  // Si es objeto con .data -> usamos .data.
-  // Si falla -> array vacío.
+  // Lógica segura para leer datos (Array o Objeto paginado)
   const categories = Array.isArray(rawData)
     ? rawData
     : (rawData as any)?.data || [];
 
-  // Estados para el Modal y Edición
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-
-  // Estado para el Buscador
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleOpenCreate = () => {
@@ -35,8 +29,21 @@ export const CategoriesPage = () => {
     setIsModalOpen(true);
   };
 
-  // Filtrado simple en cliente
-  // (Ahora 'categories' es 100% seguro un array, así que .filter no fallará)
+  // ✅ NUEVA LÓGICA DE ELIMINAR (Usando el Hook Global)
+  const handleDelete = (id: string) => {
+    confirm({
+      title: '¿Eliminar Categoría?',
+      message:
+        'Esta acción no se puede deshacer. Podrías perder la referencia en tus transacciones históricas.',
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+      onConfirm: async () => {
+        // Al ser asíncrono, el modal mostrará el spinner automáticamente
+        await deleteCategory(id);
+      },
+    });
+  };
+
   const filteredCategories = categories.filter((c: any) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -86,6 +93,7 @@ export const CategoriesPage = () => {
               key={category.id}
               category={category}
               onEdit={handleOpenEdit}
+              onDelete={handleDelete}
             />
           ))}
 
@@ -97,9 +105,8 @@ export const CategoriesPage = () => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal de Creación/Edición */}
       <CategoryModal
-        // 🔥 El truco de la Key sigue aquí: limpia el modal al cerrarse/abrirse
         key={isModalOpen ? editingCategory?.id || 'new' : 'closed'}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

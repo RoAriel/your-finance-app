@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useState } from 'react'; // Eliminamos useEffect
+import { useState } from 'react';
 import { useCategories } from '../../categories/hooks/useCategories';
 import {
   useCreateTransaction,
@@ -26,6 +26,7 @@ export const CreateTransactionModal = ({
 
   const { data: rawData } = useCategories();
 
+  // Blindaje de datos: Aseguramos que sea array
   const categories = Array.isArray(rawData)
     ? rawData
     : (rawData as any)?.data || [];
@@ -52,6 +53,7 @@ export const CreateTransactionModal = ({
     : new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(initialDate);
 
+  // Incluimos categorías del tipo seleccionado O las que son 'both' (ambos)
   const filteredCategories = categories.filter(
     (c: any) => c.type === type || c.type === 'both'
   );
@@ -69,7 +71,7 @@ export const CreateTransactionModal = ({
       currency,
     };
 
-    const options = { onSuccess: onClose }; // Solo cerramos, el 'key' se encargará de limpiar al reabrir
+    const options = { onSuccess: onClose };
 
     if (isEditing && transactionToEdit) {
       updateMutation.mutate(

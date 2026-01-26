@@ -1,28 +1,21 @@
-import {
-  Edit2,
-  Trash2,
-  ArrowUpCircle,
-  ArrowDownCircle,
-  Lock,
-} from 'lucide-react';
+import { Edit2, Trash2, Lock } from 'lucide-react';
 import type { Transaction } from '../types';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
-import { useDeleteTransaction } from '../hooks/useTransactions';
 
 interface Props {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
+  onDelete: (id: string) => void; // <--- 1. Agregamos esta prop
 }
 
-export const TransactionsTable = ({ transactions, onEdit }: Props) => {
-  // Manejo de estado vacío
-  const deleteMutation = useDeleteTransaction();
+export const TransactionsTable = ({
+  transactions,
+  onEdit,
+  onDelete,
+}: Props) => {
+  // 2. Eliminamos hooks internos (useDeleteTransaction) y lógica de confirmación.
+  // Ahora el componente es puramente visual.
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro de querer eliminar esta transacción?')) {
-      deleteMutation.mutate(id);
-    }
-  };
   if (transactions.length === 0) {
     return (
       <div className="text-center py-10 text-gray-500">
@@ -64,7 +57,7 @@ export const TransactionsTable = ({ transactions, onEdit }: Props) => {
                   {formatDate(tx.date)}
                 </td>
 
-                {/* 2. Categoría (con bolita de color) */}
+                {/* 2. Categoría */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     {tx.category && (
@@ -89,18 +82,16 @@ export const TransactionsTable = ({ transactions, onEdit }: Props) => {
                   {tx.description}
                 </td>
 
-                {/* 4. Monto (Alineado a la derecha) */}
+                {/* 4. Monto */}
                 <td
                   className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${amountColor}`}
                 >
                   {amountSign} {formatCurrency(tx.amount, tx.currency)}
                 </td>
-                {/* 5. NUEVA CELDA DE ACCIONES */}
 
-                {/* Columna de Acciones */}
+                {/* 5. Acciones */}
                 <td className="px-6 py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
-                    {/* BOTÓN EDITAR */}
                     <button
                       onClick={() => onEdit(tx)}
                       className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -109,9 +100,9 @@ export const TransactionsTable = ({ transactions, onEdit }: Props) => {
                       <Edit2 size={16} />
                     </button>
 
-                    {/* Botón Borrar (ya existía) */}
+                    {/* 3. Usamos la prop onDelete directamente */}
                     <button
-                      onClick={() => handleDelete(tx.id)}
+                      onClick={() => onDelete(tx.id)}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Eliminar"
                     >
