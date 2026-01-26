@@ -1,49 +1,34 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
+import { Link } from 'react-router-dom'; // <--- Necesario para navegar
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { TransactionsTable } from '../../transactions/components/TransactionsTable';
 import { CreateTransactionModal } from '../../transactions/components/CreateTransactionModal';
 import { StatsCards } from '../components/StatsCards';
 import { MonthSelector } from '../components/MonthSelector';
-import { Pagination } from '../../../components/ui/Pagination';
-import type { Transaction } from '../../transactions/types';
 import { useDashboardReport } from '../hooks/useDashboardReport';
 import { ExpensesChart } from '../components/ExpensesChart';
+import type { Transaction } from '../../transactions/types';
 
 export const DashboardPage = () => {
-  // 1. Estado de la Fecha Actual y Paginación
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [page, setPage] = useState(1);
 
-  // 2. DEFINIR FILTROS (Importante: Definir esto ANTES de usarlo en los hooks)
+  // Filtros fijos (Sin página)
   const filters = {
     month: currentDate.getMonth() + 1,
     year: currentDate.getFullYear(),
   };
 
-  // 3. Hook para la TABLA (Con paginación)
-  const { data: transactionsData, isLoading: isLoadingTransactions } =
-    useTransactions({
-      ...filters, // Pasa mes y año
-      page, // Pasa página actual
-      limit: 10, // Límite por página
-    });
+  // 1. Hook para TABLA RESUMEN (Solo 5 items, sin paginación)
+  const { data: transactionsData } = useTransactions({
+    ...filters,
+    page: 1,
+    limit: 5,
+  });
 
-  // 4. Hook para el REPORTE (Gráficos y Totales del mes completo)
+  // 2. Hook para REPORTE (Gráficos)
   const { data: reportData, isLoading: isLoadingReport } =
     useDashboardReport(filters);
-
-  // 🕵️‍♂️ AGREGA ESTO TEMPORALMENTE:
-  console.log('--- DEBUG DASHBOARD ---');
-  console.log('Filtros enviados:', filters);
-  console.log('Datos recibidos (Reporte):', reportData);
-  console.log('Chart Data:', reportData?.chartData);
-
-  // Resetear a página 1 si cambiamos de mes
-  const handleDateChange = (newDate: Date) => {
-    setCurrentDate(newDate);
-    setPage(1);
-  };
 
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,67 +47,83 @@ export const DashboardPage = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header con Título y SELECTOR DE FECHA */}
+      {/* Header Simplificado */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
             Resumen Financiero
           </h1>
-          <p className="text-gray-500">Administra tus gastos mensuales</p>
+          <p className="text-gray-500">
+            Panorama general de{' '}
+            {new Intl.DateTimeFormat('es-AR', { month: 'long' }).format(
+              currentDate
+            )}
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
-          <MonthSelector
-            currentDate={currentDate}
-            onChange={handleDateChange}
-          />
+          <MonthSelector currentDate={currentDate} onChange={setCurrentDate} />
 
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-lg hover:bg-primary-hover transition-colors font-medium shadow-sm cursor-pointer"
+            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-hover shadow-sm md:hidden"
           >
-            <Plus size={20} />
-            <span className="hidden sm:inline">Nueva</span>
+            <Plus size={24} />
           </button>
         </div>
       </div>
 
+      {/* Grid Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna Izquierda: Stats y Tabla (2/3 del ancho) */}
+        {/* Columna Izquierda: Stats y Gráfico (Ocupa 2/3) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* TODO: Más adelante pasaremos reportData?.summary a las StatsCards */}
           <StatsCards />
 
-          {/* TABLA DE TRANSACCIONES */}
-          <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col">
-            <div className="p-4 border-b border-gray-100 font-bold text-gray-700">
-              Últimos Movimientos
-            </div>
+          {/* Aquí irá el futuro Widget de Fijo vs Variable (Módulo 11) */}
 
-            <TransactionsTable
-              transactions={transactionsData?.data || []}
-              onEdit={handleOpenEdit}
-            />
-
-            {/* Paginación solo si hay metadata */}
-            {transactionsData?.meta && (
-              <Pagination
-                page={transactionsData.meta.page}
-                totalPages={transactionsData.meta.totalPages}
-                hasPreviousPage={transactionsData.meta.hasPreviousPage}
-                hasNextPage={transactionsData.meta.hasNextPage}
-                onPageChange={setPage}
-              />
-            )}
-          </section>
-        </div>
-
-        {/* Columna Derecha: Gráfico (1/3 del ancho) */}
-        <div className="lg:col-span-1">
           <ExpensesChart
             data={reportData?.chartData || []}
             isLoading={isLoadingReport}
           />
+        </div>
+
+        {/* Columna Derecha: Lista Rápida (Ocupa 1/3) */}
+        <div className="lg:col-span-1">
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="font-bold text-gray-700">Últimos Movimientos</h3>
+              <Link
+                to="/transactions"
+                className="text-sm text-primary hover:underline flex items-center gap-1"
+              >
+                Ver todo <ArrowRight size={14} />
+              </Link>
+            </div>
+
+            <div className="overflow-hidden">
+              {/* Usamos la misma tabla pero en contexto reducido */}
+              <TransactionsTable
+                transactions={transactionsData?.data || []}
+                onEdit={handleOpenEdit}
+              />
+            </div>
+
+            {(!transactionsData?.data ||
+              transactionsData.data.length === 0) && (
+              <div className="p-8 text-center text-gray-400 text-sm">
+                No hay movimientos recientes.
+              </div>
+            )}
+
+            <div className="p-4 mt-auto border-t border-gray-50">
+              <button
+                onClick={handleOpenCreate}
+                className="w-full py-2 border-2 border-dashed border-gray-200 text-gray-500 rounded-lg hover:border-primary hover:text-primary transition-colors text-sm font-medium"
+              >
+                + Agregar Rápido
+              </button>
+            </div>
+          </section>
         </div>
       </div>
 

@@ -1,32 +1,28 @@
 import { Outlet } from 'react-router-dom';
+import { Sidebar } from '../components/layout/Sidebar'; // <--- Importamos el nuevo componente
 
 export const MainLayout = () => {
   return (
-    // 1. CONTENEDOR PADRE: Ocupa toda la altura (h-screen) y es flexible (flex)
+    // 1. CONTENEDOR PADRE
     <div className="flex h-screen w-full bg-gray-50">
-      {/* 2. SIDEBAR: Ancho fijo (w-64), oculto en móvil (hidden md:block) */}
-      <aside className="w-64 bg-white border-r border-gray-200">
-        <div className="p-4">
-          <h2 className="text-xl font-bold text-primary">Your Finance</h2>
-          {/* Aquí irán los links de navegación más tarde */}
-        </div>
-      </aside>
+      {/* 2. SIDEBAR (Ya no está hardcodeado aquí) */}
+      <Sidebar />
 
-      {/* 3. ZONA PRINCIPAL: Crece para ocupar el resto (flex-1) y es columna (flex-col) */}
+      {/* 3. ZONA PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* A. NAVBAR: Altura fija (h-16), fondo blanco */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6">
-          {/* Texto temporal */}
-          <span className="text-gray-500">Navbar</span>
+        {/* A. NAVBAR */}
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
+          <span className="font-semibold text-gray-700">
+            Bienvenido de nuevo 👋
+          </span>
+          {/* Aquí podrías poner un avatar de usuario más tarde */}
+          <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-xs">
+            RA
+          </div>
         </header>
 
-        {/* B. CONTENIDO DINÁMICO: Aquí es donde ocurre la magia */}
-        <div className="flex-1 overflow-auto p-6">
-          {/* PREGUNTA DE ORO: 
-              ¿Qué componente de 'react-router-dom' importamos arriba 
-              y debemos poner aquí para que se rendericen las rutas hijas?
-           */}
-
+        {/* B. CONTENIDO DINÁMICO */}
+        <div className="flex-1 overflow-auto bg-gray-50/50">
           <Outlet />
         </div>
       </main>
