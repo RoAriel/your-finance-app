@@ -1,13 +1,12 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { useCategories } from '../../categories/hooks/useCategories';
 import {
   useCreateTransaction,
   useUpdateTransaction,
 } from '../hooks/useTransactions';
 import type { Transaction } from '../types';
-import type { PaginatedResponse } from '../../../types';
-import type { Category } from '../../categories/types';
+// 👇 1. Importamos el selector modular
+import { CategorySelector } from '../../../components/common/CategorySelector';
 
 interface Props {
   isOpen: boolean;
@@ -26,16 +25,20 @@ export const CreateTransactionModal = ({
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
-  const { data: rawData } = useCategories();
-
-  // Blindaje de datos: Aseguramos que sea array
-  const categories = Array.isArray(rawData)
-    ? (rawData as Category[])
-    : (rawData as unknown as PaginatedResponse<Category>)?.data || [];
+  // ❌ BORRADO: Ya no necesitamos useCategories ni la lógica de blindaje manual
+  // const { data: rawData } = useCategories(); ...
 
   const [type, setType] = useState<Transaction['type']>(
     transactionToEdit?.type || 'expense'
   );
+
+  // Cuando cambiamos el tab (Ingreso/Gasto), reseteamos la categoría seleccionada
+  // para evitar que quede una categoría de Gasto seleccionada cuando pasas a Ingreso.
+  const handleTypeChange = (newType: Transaction['type']) => {
+    setType(newType);
+    setCategoryId('');
+  };
+
   const [amount, setAmount] = useState(
     transactionToEdit?.amount?.toString() || ''
   );
@@ -49,16 +52,12 @@ export const CreateTransactionModal = ({
     transactionToEdit?.categoryId || ''
   );
 
-  // Manejo seguro de la fecha
   const initialDate = transactionToEdit?.date
     ? new Date(transactionToEdit.date).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(initialDate);
 
-  // Incluimos categorías del tipo seleccionado O las que son 'both' (ambos)
-  const filteredCategories = categories.filter(
-    (c) => c.type === type || c.type === 'both'
-  );
+  // ❌ BORRADO: filteredCategories ya lo maneja el componente hijo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,14 +106,14 @@ export const CreateTransactionModal = ({
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
-              onClick={() => setType('expense')}
+              onClick={() => handleTypeChange('expense')}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'expense' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Gasto
             </button>
             <button
               type="button"
-              onClick={() => setType('income')}
+              onClick={() => handleTypeChange('income')}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${type === 'income' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Ingreso
@@ -153,23 +152,18 @@ export const CreateTransactionModal = ({
             </div>
           </div>
 
+          {/* 👇 IMPLEMENTACIÓN MODULAR */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoría
             </label>
-            <select
-              required
+            <CategorySelector
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white"
-            >
-              <option value="">Selecciona una opción...</option>
-              {filteredCategories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+              onChange={setCategoryId}
+              // Convertimos 'expense' (estado local) a 'EXPENSE' (prop del componente)
+              type={type === 'expense' ? 'EXPENSE' : 'INCOME'}
+              placeholder="Selecciona una categoría..."
+            />
           </div>
 
           <div>

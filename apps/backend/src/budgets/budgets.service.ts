@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { AppLogger } from '../common/utils/logger.util';
-import { TransactionType } from '../transactions/dto/create-transaction.dto';
+//import { TransactionType } from '../transactions/dto/create-transaction.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { Prisma } from '@prisma/client';
 
@@ -49,27 +49,36 @@ export class BudgetsService {
     }
   }
 
-  async findAll(userId: string) {
+  async findAll(userId: string, month?: number, year?: number) {
     const operation = 'Obtener Reporte de Presupuestos';
 
     try {
-      this.logger.logOperation(operation, { userId });
+      // Logueamos también si se está filtrando
+      this.logger.logOperation(operation, { userId, month, year });
 
-      // A. Traemos todos los presupuestos definidos
+      // --- CAMBIO CLAVE AQUÍ ---
+      // Construimos el filtro dinámicamente
+      const whereInput: Prisma.BudgetWhereInput = {
+        userId,
+        ...(month && { month }), // "Si existe month, agrega la propiedad { month: month }"
+        ...(year && { year }), // "Si existe year, agrega la propiedad { year: year }"
+      };
+      if (month) whereInput.month = month;
+      if (year) whereInput.year = year;
+      // -------------------------
+
+      // A. Traemos los presupuestos (Filtrados por la lógica de arriba)
       const budgets = await this.prisma.budget.findMany({
-        where: { userId },
-        include: { category: true }, // Traemos el nombre de la categoría (ej: "Comida")
-        orderBy: { year: 'desc' }, // Ordenamos por fecha
+        where: whereInput, // <--- Usamos el filtro dinámico
+        include: { category: true },
+        orderBy: { year: 'desc' },
       });
 
-      // B. Calculamos el "Gastado Real" para cada presupuesto
-      // Usamos Promise.all para hacer los cálculos en paralelo (rápido)
+      // B. Calculamos el "Gastado Real" (ESTO QUEDA IGUAL, es tu lógica robusta)
       const report = await Promise.all(
         budgets.map(async (budget) => {
-          // Definir el rango de fechas del mes del presupuesto
-          // Nota: en JS los meses son base 0 (Enero = 0), pero en tu DB guardamos 1
           const startDate = new Date(budget.year, budget.month - 1, 1);
-          const endDate = new Date(budget.year, budget.month, 0); // Día 0 del siguiente mes = Último día de este mes
+          const endDate = new Date(budget.year, budget.month, 0);
 
           // C. Consulta de Agregación (SUM)
           const aggregate = await this.prisma.transaction.aggregate({
@@ -79,7 +88,7 @@ export class BudgetsService {
             where: {
               userId,
               categoryId: budget.categoryId,
-              type: TransactionType.EXPENSE, // Solo sumamos GASTOS (ignoramos ingresos o transferencias)
+              type: 'EXPENSE', // Asegúrate de que coincida con tu Enum (TransactionType.EXPENSE)
               date: {
                 gte: startDate,
                 lte: endDate,
@@ -96,13 +105,14 @@ export class BudgetsService {
           // E. Devolvemos el objeto enriquecido
           return {
             id: budget.id,
-            category: budget.category.name, // Nombre amigable
+            categoryId: budget.category.id, // Corregí el nombre para que coincida con tu frontend
+            categoryName: budget.category.name,
             month: budget.month,
             year: budget.year,
-            limit: limit, // Lo que planeaste
-            spent: spent, // Lo que gastaste realidad
-            remaining, // Lo que te queda
-            percentage, // % de barra de progreso (ej: 80%)
+            amount: limit,
+            spent: spent,
+            remaining,
+            percentage,
             status: percentage > 100 ? 'EXCEEDED' : 'OK',
           };
         }),

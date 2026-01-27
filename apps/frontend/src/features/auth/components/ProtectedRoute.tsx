@@ -1,15 +1,13 @@
 import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth'; // Importar hook
 
 export const ProtectedRoute = () => {
-  // Verificamos si existe el token en el almacenamiento
-  // OJO: En una app real, aquí verificaríamos si el token no ha expirado
-  const isAuthenticated = !!localStorage.getItem('token');
+  // 👇 Ahora miramos el estado global, no el localStorage directo
+  const { isAuthenticated } = useAuth();
 
   if (!isAuthenticated) {
-    // Si no tiene pase, lo mandamos a la entrada (replace evita que pueda volver atrás)
     return <Navigate to="/login" replace />;
   }
 
-  // Si tiene pase, renderizamos el contenido hijo (Outlet)
   return <Outlet />;
 };

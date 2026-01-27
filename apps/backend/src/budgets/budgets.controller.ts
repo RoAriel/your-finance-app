@@ -7,6 +7,8 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BudgetsService } from './budgets.service';
@@ -33,8 +35,20 @@ export class BudgetsController {
 
   @Get()
   @ApiOperation({ summary: 'Ver reporte de presupuestos (Progreso vs Límite)' })
-  findAll(@CurrentUser('id') userId: string) {
-    return this.budgetsService.findAll(userId);
+  findAll(
+    // 1. MANTENEMOS tu decorador para sacar el ID del usuario seguro
+    @CurrentUser('id') userId: string,
+
+    // 2. AGREGAMOS los Query params para el filtro (vienen como string desde la URL)
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    // 3. Convertimos a número antes de pasar al servicio (si vienen definidos)
+    const monthNum = month ? Number(month) : undefined;
+    const yearNum = year ? Number(year) : undefined;
+
+    // 4. Llamamos al servicio con los 3 datos
+    return this.budgetsService.findAll(userId, monthNum, yearNum);
   }
 
   @Patch(':id')

@@ -1,16 +1,33 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, LogOut, Tags } from 'lucide-react';
+import { LayoutDashboard, ListTodo, LogOut, Tags, Wallet } from 'lucide-react';
+import { useAuth } from '../../features/auth/hooks/useAuth';
 
 export const Sidebar = () => {
+  const { logout } = useAuth();
+
   const navLinks = [
     {
       to: '/dashboard',
       text: 'Dashboard',
       icon: <LayoutDashboard size={20} />,
     },
-    { to: '/transactions', text: 'Movimientos', icon: <ListTodo size={20} /> },
-    { to: '/categories', text: 'Categorías', icon: <Tags size={20} /> },
+    {
+      to: '/transactions',
+      text: 'Movimientos',
+      icon: <ListTodo size={20} />,
+    },
+    {
+      to: '/categories',
+      text: 'Categorías',
+      icon: <Tags size={20} />,
+    },
+    {
+      to: '/budgets', // ✅ Nuevo link
+      text: 'Presupuestos',
+      icon: <Wallet size={20} />, // ✅ Nuevo icono
+    },
   ];
+
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-full md:flex">
       {/* 1. LOGO */}
@@ -43,7 +60,10 @@ export const Sidebar = () => {
 
       {/* 3. FOOTER (Logout) */}
       <div className="p-4 border-t border-gray-50">
-        <button className="flex items-center gap-3 px-4 py-3 w-full text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors font-medium">
+        <button
+          onClick={logout} // ✅ Conectado a la función real
+          className="flex items-center gap-3 px-4 py-3 w-full text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors font-medium"
+        >
           <LogOut size={20} />
           <span>Cerrar Sesión</span>
         </button>

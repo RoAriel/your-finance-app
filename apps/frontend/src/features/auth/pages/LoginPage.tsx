@@ -1,18 +1,17 @@
-import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import axios from 'axios'; // 1. Importamos Axios para validar errores
-import { authService } from '../services/auth.service';
-import { logger } from '../../../utils/appLogger';
-import { LogIn, AlertCircle } from 'lucide-react'; // 2. Agregamos AlertCircle
+import { LogIn, AlertCircle } from 'lucide-react';
+import axios from 'axios';
+// 👇 CAMBIO IMPORTANTE: Ya no importamos authService ni useNavigate directamente
+import { useAuth } from '../hooks/useAuth';
 
 export const LoginPage = () => {
-  const navigate = useNavigate();
+  // 👇 Usamos el hook
+  const { login } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // (Eliminamos el 'a gn' que tenías aquí colgado por error)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,13 +19,11 @@ export const LoginPage = () => {
     setError(null);
 
     try {
-      await authService.login({ email, password });
-      navigate('/dashboard');
+      // 👇 Llamamos al login del contexto (que ya hace la redirección)
+      await login({ email, password });
     } catch (err: unknown) {
-      // 3. Corregimos 'any' por 'unknown'
       let msg = 'Error al iniciar sesión';
 
-      // 4. Lógica segura para extraer el mensaje del Backend
       if (axios.isAxiosError(err) && err.response?.data) {
         const data = err.response.data as { message: string | string[] };
         msg = Array.isArray(data.message) ? data.message[0] : data.message;
@@ -35,7 +32,6 @@ export const LoginPage = () => {
       }
 
       setError(msg);
-      logger.error('Fallo en login UI', msg);
     } finally {
       setIsLoading(false);
     }
