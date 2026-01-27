@@ -53,32 +53,32 @@ export class BudgetsService {
     const operation = 'Obtener Reporte de Presupuestos';
 
     try {
-      // Logueamos también si se está filtrando
       this.logger.logOperation(operation, { userId, month, year });
 
-      // --- CAMBIO CLAVE AQUÍ ---
-      // Construimos el filtro dinámicamente
+      // 1. Filtro dinámico limpio (usando tipos de Prisma)
       const whereInput: Prisma.BudgetWhereInput = {
         userId,
-        ...(month && { month }), // "Si existe month, agrega la propiedad { month: month }"
-        ...(year && { year }), // "Si existe year, agrega la propiedad { year: year }"
+        ...(month && { month }),
+        ...(year && { year }),
       };
-      if (month) whereInput.month = month;
-      if (year) whereInput.year = year;
-      // -------------------------
 
-      // A. Traemos los presupuestos (Filtrados por la lógica de arriba)
+      // A. Traemos los presupuestos
       const budgets = await this.prisma.budget.findMany({
-        where: whereInput, // <--- Usamos el filtro dinámico
+        where: whereInput,
         include: { category: true },
         orderBy: { year: 'desc' },
       });
 
-      // B. Calculamos el "Gastado Real" (ESTO QUEDA IGUAL, es tu lógica robusta)
+      // B. Calculamos el "Gastado Real" cruzando con Transacciones
       const report = await Promise.all(
         budgets.map(async (budget) => {
+          // --- CORRECCIÓN DE FECHAS (Cobertura total del mes) ---
+          // Desde: Día 1 del mes a las 00:00:00
           const startDate = new Date(budget.year, budget.month - 1, 1);
-          const endDate = new Date(budget.year, budget.month, 0);
+
+          // Hasta: Día 1 del MES SIGUIENTE a las 00:00:00
+          // Usaremos "menor estricto" (<) para incluir hasta el último milisegundo del mes actual
+          const nextMonthDate = new Date(budget.year, budget.month, 1);
 
           // C. Consulta de Agregación (SUM)
           const aggregate = await this.prisma.transaction.aggregate({
@@ -88,28 +88,32 @@ export class BudgetsService {
             where: {
               userId,
               categoryId: budget.categoryId,
-              type: 'EXPENSE', // Asegúrate de que coincida con tu Enum (TransactionType.EXPENSE)
+
+              // --- CORRECCIÓN CRÍTICA ---
+              // Usamos 'expense' en minúscula tal como confirmaste que está en tu DB
+              type: 'expense',
+
               date: {
-                gte: startDate,
-                lte: endDate,
+                gte: startDate, // Mayor o igual al inicio
+                lt: nextMonthDate, // Menor estricto al inicio del siguiente mes
               },
             },
           });
 
           // D. Matemáticas Simples
           const spent = Number(aggregate._sum.amount || 0);
-          const limit = Number(budget.amount);
+          const limit = Number(budget.amount); // Tu DB usa 'amount'
           const remaining = limit - spent;
           const percentage = limit > 0 ? Math.round((spent / limit) * 100) : 0;
 
-          // E. Devolvemos el objeto enriquecido
+          // E. Retorno con nombres que espera el Frontend
           return {
             id: budget.id,
-            categoryId: budget.category.id, // Corregí el nombre para que coincida con tu frontend
+            categoryId: budget.categoryId,
             categoryName: budget.category.name,
             month: budget.month,
             year: budget.year,
-            amount: limit,
+            amount: limit, // Frontend espera 'amount' (o 'limit', según tu interfaz, ajústalo si es necesario)
             spent: spent,
             remaining,
             percentage,
