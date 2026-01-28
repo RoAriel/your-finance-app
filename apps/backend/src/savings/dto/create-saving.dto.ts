@@ -4,8 +4,11 @@ import {
   IsEnum,
   IsHexColor,
   IsOptional,
+  IsNumber,
+  Min,
+  IsDateString,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSavingsAccountDto {
   @ApiProperty({
@@ -35,4 +38,24 @@ export class CreateSavingsAccountDto {
   @IsOptional()
   @IsHexColor()
   color?: string;
+
+  @ApiPropertyOptional({
+    description: 'Icono identificador',
+    default: 'wallet',
+  })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  // 👇 NUEVOS CAMPOS
+  @ApiPropertyOptional({ description: 'Monto objetivo a alcanzar' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  targetAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Fecha límite para la meta (ISO 8601)' })
+  @IsOptional()
+  @IsDateString() // Valida que sea un string tipo fecha "2026-12-31"
+  targetDate?: string; // Lo recibimos como string y Prisma lo convierte a Date
 }

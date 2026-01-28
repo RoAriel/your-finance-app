@@ -54,10 +54,28 @@ export class SavingsService {
         orderBy: { createdAt: 'asc' },
       });
 
-      // En listas, es útil loguear cuántos resultados encontramos
       this.logger.logSuccess(operation, { count: accounts.length });
 
-      return accounts;
+      // 👇 Mapeo para calcular Progreso y limpiar tipos Decimal
+      return accounts.map((acc) => {
+        const balance = Number(acc.balance);
+        const targetAmount = acc.targetAmount ? Number(acc.targetAmount) : 0;
+        let progress = 0;
+
+        // Solo calculamos progreso si hay una meta real
+        if (targetAmount > 0) {
+          progress = Math.min((balance / targetAmount) * 100, 100); // Tope 100%
+        }
+
+        return {
+          ...acc,
+          // Sobrescribimos con Number para facilitar uso en Frontend
+          balance,
+          targetAmount: targetAmount > 0 ? targetAmount : null,
+          // Campo virtual nuevo
+          progress: Math.round(progress),
+        };
+      });
     } catch (error) {
       this.logger.logFailure(operation, error as Error);
       throw error;
