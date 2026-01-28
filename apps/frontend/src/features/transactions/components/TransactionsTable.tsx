@@ -30,16 +30,16 @@ export const TransactionsTable = ({
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Fecha
+              Descripción
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Monto
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Categoría
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Descripción
-            </th>
-            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Monto
+              Fecha
             </th>
             <th className="px-6 py-3"></th>
           </tr>
@@ -52,12 +52,18 @@ export const TransactionsTable = ({
 
             return (
               <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                {/* 1. Fecha */}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(tx.date)}
+                {/* 1. Descripción */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  {tx.description}
+                </td>
+                {/* 2. Monto */}
+                <td
+                  className={`px-6 py-4 whitespace-nowrap text-sm  font-bold ${amountColor}`}
+                >
+                  {amountSign} {formatCurrency(tx.amount, tx.currency)}
                 </td>
 
-                {/* 2. Categoría */}
+                {/* 3. Categoría */}
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     {tx.category && (
@@ -77,16 +83,9 @@ export const TransactionsTable = ({
                   </div>
                 </td>
 
-                {/* 3. Descripción */}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {tx.description}
-                </td>
-
-                {/* 4. Monto */}
-                <td
-                  className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${amountColor}`}
-                >
-                  {amountSign} {formatCurrency(tx.amount, tx.currency)}
+                {/* 4. Fecha */}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(tx.date)}
                 </td>
 
                 {/* 5. Acciones */}

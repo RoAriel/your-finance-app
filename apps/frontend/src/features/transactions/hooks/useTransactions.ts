@@ -2,21 +2,51 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionsService } from '../services/transactions.service';
 import type { CreateTransactionDTO, UpdateTransactionDTO } from '../types';
+import { api } from '../../../lib/axios';
+import type { PaginatedResponse } from '../../../types';
+import type { Transaction } from '../types';
 
-export const useTransactions = () => {
+interface TransactionFilters {
+  month?: number;
+  year?: number;
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+export const useTransactions = (overrides?: TransactionFilters) => {
   const queryClient = useQueryClient();
 
   // 1. Estado local para filtros (Search, Fechas, etc.)
-  const [filters, setFilters] = useState({
-    search: '',
+
+  const [internalFilters, setInternalFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
+    page: 1,
+    limit: 10,
+    search: '',
   });
+
+  const activeFilters = overrides || internalFilters;
 
   // 2. EL QUERY (Obtener datos)
   const query = useQuery({
-    queryKey: ['transactions', filters], // Se recarga si cambian los filtros
-    queryFn: () => transactionsService.getAll(filters),
+    // La key debe incluir los filtros activos para que refresque si cambian
+    queryKey: ['transactions', activeFilters],
+    queryFn: async () => {
+      // Construimos la URL string con los filtros activos
+      const params = new URLSearchParams({
+        page: activeFilters.page?.toString() || '1',
+        limit: activeFilters.limit?.toString() || '10',
+        month: activeFilters.month?.toString() || '',
+        year: activeFilters.year?.toString() || '',
+        search: activeFilters.search || '',
+      });
+
+      const { data } = await api.get<PaginatedResponse<Transaction>>(
+        `/transactions?${params.toString()}`
+      );
+      return data;
+    },
   });
 
   // 3. MUTACIÓN: CREAR
@@ -59,8 +89,8 @@ export const useTransactions = () => {
     deleteTransaction: deleteMutation.mutateAsync, // <--- ¡Aquí está la magia!
 
     // Filtros para la UI
-    filters,
-    setFilters,
+    filters: internalFilters,
+    setFilters: setInternalFilters,
 
     // Estados de carga extra
     isCreating: createMutation.isPending,

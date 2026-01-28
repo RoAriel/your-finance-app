@@ -9,6 +9,8 @@ import { MonthSelector } from '../components/MonthSelector';
 import { useDashboardReport } from '../hooks/useDashboardReport';
 import { ExpensesChart } from '../components/ExpensesChart';
 import { FinancialHealthWidget } from '../components/FinancialHealthWidget';
+import { BudgetAlertsWidget } from '../components/BudgetAlertsWidget';
+import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
 import type { Transaction } from '../../transactions/types';
 
 export const DashboardPage = () => {
@@ -21,7 +23,11 @@ export const DashboardPage = () => {
   };
 
   // 1. Hook para TABLA RESUMEN (Solo 5 items, sin paginación)
-  const { data: transactionsData } = useTransactions({
+  const {
+    data: transactionsData,
+    deleteTransaction,
+    isDeleting,
+  } = useTransactions({
     ...filters,
     page: 1,
     limit: 5,
@@ -36,6 +42,10 @@ export const DashboardPage = () => {
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
 
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(
+    null
+  );
+
   const handleOpenCreate = () => {
     setEditingTransaction(null);
     setIsModalOpen(true);
@@ -44,6 +54,17 @@ export const DashboardPage = () => {
   const handleOpenEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setIsModalOpen(true);
+  };
+
+  const handleOpenDelete = (id: string) => {
+    setTransactionToDelete(id); // Guardamos el ID y esto abre el modal (porque ID existe)
+  };
+
+  const handleConfirmDelete = async () => {
+    if (transactionToDelete) {
+      await deleteTransaction(transactionToDelete);
+      setTransactionToDelete(null); // Cerramos el modal
+    }
   };
 
   return (
@@ -79,6 +100,7 @@ export const DashboardPage = () => {
         {/* Columna Izquierda: Stats y Gráfico (Ocupa 2/3) */}
         <div className="lg:col-span-2 space-y-6">
           <StatsCards />
+          <BudgetAlertsWidget month={filters.month} year={filters.year} />
 
           {reportData?.expensesAnalysis && (
             <FinancialHealthWidget
@@ -111,6 +133,7 @@ export const DashboardPage = () => {
               <TransactionsTable
                 transactions={transactionsData?.data || []}
                 onEdit={handleOpenEdit}
+                onDelete={handleOpenDelete}
               />
             </div>
 
@@ -138,6 +161,15 @@ export const DashboardPage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         transactionToEdit={editingTransaction}
+      />
+
+      <ConfirmationModal
+        isOpen={!!transactionToDelete}
+        onClose={() => setTransactionToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Eliminar movimiento"
+        message="¿Estás seguro de que deseas eliminar este registro? Esta acción afectará tus reportes y presupuestos."
+        isLoading={isDeleting}
       />
     </div>
   );

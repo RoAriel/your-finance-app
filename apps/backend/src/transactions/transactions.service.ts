@@ -76,6 +76,7 @@ export class TransactionsService {
       currency,
       year,
       month,
+      search,
     } = query;
 
     // Construir filtros
@@ -83,6 +84,19 @@ export class TransactionsService {
       userId,
       deletedAt: null,
     };
+
+    if (search) {
+      where.OR = [
+        // Buscar en la descripción
+        {
+          description: { contains: search, mode: 'insensitive' },
+        },
+        // Opcional: Buscar también por el nombre de la categoría
+        {
+          category: { name: { contains: search, mode: 'insensitive' } },
+        },
+      ];
+    }
 
     if (type) {
       where.type = type;
