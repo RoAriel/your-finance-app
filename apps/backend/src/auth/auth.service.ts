@@ -18,36 +18,62 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    // 1. Verificar si el email ya existe
+    // 1. Desestructuramos para obtener la moneda (con default ARS)
+    const { email, password, name, currency = 'ARS' } = dto;
+
+    // 2. Verificar si existe
     const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (existingUser) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('El email ya está registrado');
     }
 
-    // 2. Hashear el password
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // 3. Hashear password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Crear el usuario
-    const user = await this.prisma.user.create({
-      data: {
-        email: dto.email,
-        password: hashedPassword,
-        name: dto.name,
-      },
+    // 4. TRANSACCIÓN: Usuario + Cuenta Default
+    // Usamos $transaction para que si falla la cuenta, no se cree el usuario (Atomicidad)
+    const newUser = await this.prisma.$transaction(async (tx) => {
+      // A. Crear Usuario
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          currency, // Guardamos la preferencia de moneda
+          fiscalStartDay: 1, // Default
+          // Role y Subscription toman los defaults de la BD (USER, FREE)
+        },
+      });
+
+      // B. Crear su Billetera Principal
+      await tx.savingsAccount.create({
+        data: {
+          name: 'Efectivo / Billetera',
+          userId: user.id,
+          currency: currency, // Hereda la moneda del usuario
+          icon: 'wallet',
+          color: '#10B981', // Verde
+          balance: 0,
+          isDefault: true, // 🛡️ ¡Importante! Protegida contra borrado
+        },
+      });
+
+      return user;
     });
 
-    // 4. Generar token
-    const token = this.generateToken(user.id, user.email);
+    // 5. Generar Token (Auto-login)
+    const token = this.generateToken(newUser.id, newUser.email);
 
-    // 5. Retornar usuario (sin password) y token
+    // 6. Retornar respuesta
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        currency: newUser.currency,
       },
       token,
     };

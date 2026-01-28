@@ -6,6 +6,7 @@ import {
   IsDateString,
   Min,
   MaxLength,
+  IsNotEmpty,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -60,6 +61,7 @@ export class CreateTransactionDto {
   @IsDateString()
   @IsOptional()
   date?: string;
+
   @ApiProperty({
     description: 'ID de la categoría asociada al movimiento',
     example: '92b77be3-a14a-462c-a291-7eff27cbcf47',
@@ -67,4 +69,8 @@ export class CreateTransactionDto {
   @IsString()
   @IsOptional()
   categoryId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
 }

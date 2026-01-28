@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   Max,
+  IsNotEmpty,
 } from 'class-validator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -63,4 +64,8 @@ export class QueryTransactionDto extends PaginationDto {
   @IsInt()
   @Min(2000)
   year?: number;
+
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
 }
