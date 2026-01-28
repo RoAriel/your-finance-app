@@ -1,5 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ListTodo, LogOut, Tags, Wallet } from 'lucide-react';
+import {
+  LayoutDashboard,
+  ListTodo,
+  LogOut,
+  Tags,
+  Wallet,
+  PiggyBank,
+} from 'lucide-react';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 
 export const Sidebar = () => {
@@ -25,6 +32,12 @@ export const Sidebar = () => {
       to: '/budgets', // ✅ Nuevo link
       text: 'Presupuestos',
       icon: <Wallet size={20} />, // ✅ Nuevo icono
+    },
+
+    {
+      to: '/savings', // ✅ Nuevo link
+      text: 'Ahorros',
+      icon: <PiggyBank size={20} />, // ✅ Nuevo icono
     },
   ];
 

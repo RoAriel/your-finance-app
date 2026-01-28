@@ -9,6 +9,8 @@ import { CreateSavingsAccountDto } from './dto/create-saving.dto';
 import { AppLogger } from '../common/utils/logger.util';
 import { TransferDto } from './dto/transfer.dto';
 import { TransactionType } from '../transactions/dto/create-transaction.dto';
+import { UpdateSavingDto } from './dto/update-saving.dto';
+import { DepositDto } from './dto/deposit.dto';
 
 @Injectable()
 export class SavingsService {
@@ -82,12 +84,14 @@ export class SavingsService {
     }
   }
 
-  async deposit(accountId: string, amount: number, userId: string) {
+  async deposit(accountId: string, dto: DepositDto, userId: string) {
     const operation = 'Depositar Fondos';
-    try {
-      this.logger.logOperation(operation, { accountId, amount });
+    const { amount, description } = dto; // 👈 Extraemos la descripción aquí
 
-      // Verificar que la cuenta existe y es mía
+    try {
+      this.logger.logOperation(operation, { accountId, ...dto });
+
+      // 1. Verificaciones previas (fuera de la transacción para ahorrar recursos)
       const account = await this.prisma.savingsAccount.findUnique({
         where: { id: accountId },
       });
@@ -95,14 +99,33 @@ export class SavingsService {
       if (account.userId !== userId)
         throw new ForbiddenException('Not your account');
 
-      // Actualizar saldo
-      const updated = await this.prisma.savingsAccount.update({
-        where: { id: accountId },
-        data: { balance: { increment: amount } }, // Prisma hace la suma mágica
+      // 2. 🔥 PRISMA TRANSACTION (Todo o Nada)
+      const result = await this.prisma.$transaction(async (tx) => {
+        // A. Actualizar saldo (Incrementar)
+        const updatedAccount = await tx.savingsAccount.update({
+          where: { id: accountId },
+          data: { balance: { increment: amount } },
+        });
+
+        // B. Crear registro en el historial (Transaction)
+        // Esto soluciona el "¿De dónde salió este dinero?"
+        await tx.transaction.create({
+          data: {
+            amount: amount,
+            description: description || 'Depósito manual', // 👈 Usamos el dato del frontend
+            date: new Date(),
+            // Asegúrate de usar un tipo válido de tu Enum (ej: INCOME o DEPOSIT)
+            type: TransactionType.INCOME,
+            userId,
+            savingsAccountId: accountId, // <--- Vinculamos a la meta
+          },
+        });
+
+        return updatedAccount;
       });
 
-      this.logger.logSuccess(operation, { newBalance: updated.balance });
-      return updated;
+      this.logger.logSuccess(operation, { newBalance: result.balance });
+      return result;
     } catch (error) {
       this.logger.logFailure(operation, error as Error);
       throw error;
@@ -111,7 +134,7 @@ export class SavingsService {
 
   async transfer(dto: TransferDto, userId: string) {
     const operation = 'Transferencia entre Cuentas';
-    const { sourceAccountId, targetAccountId, amount } = dto;
+    const { sourceAccountId, targetAccountId, amount, description } = dto;
 
     try {
       this.logger.logOperation(operation, dto);
@@ -178,7 +201,9 @@ export class SavingsService {
         await tx.transaction.create({
           data: {
             amount: amount,
-            description: `Transferencia recibida de cuenta origen`,
+            description: description
+              ? `Recibido: ${description}`
+              : `Transferencia recibida`,
             date: new Date(),
             type: TransactionType.TRANSFER_IN, // O 'TRANSFER_IN'
             userId,
@@ -195,5 +220,34 @@ export class SavingsService {
       this.logger.logFailure(operation, error as Error);
       throw error;
     }
+  }
+
+  async remove(userId: string, id: string) {
+    // 1. Verificar que la meta exista y pertenezca al usuario
+    const goal = await this.prisma.savingsAccount.findFirst({
+      where: { id, userId },
+    });
+
+    if (!goal) {
+      throw new NotFoundException('Meta de ahorro no encontrada');
+    }
+
+    // 2. Eliminar
+    return this.prisma.savingsAccount.delete({
+      where: { id },
+    });
+  }
+
+  async update(userId: string, id: string, dto: UpdateSavingDto) {
+    // Verificar propiedad
+    const goal = await this.prisma.savingsAccount.findFirst({
+      where: { id, userId },
+    });
+    if (!goal) throw new NotFoundException('Meta no encontrada');
+
+    return this.prisma.savingsAccount.update({
+      where: { id },
+      data: dto,
+    });
   }
 }

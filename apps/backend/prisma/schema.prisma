@@ -8,17 +8,37 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
 // ===========================================
 // USER MODEL
 // ===========================================
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
+  id        String   @id @default(uuid())
+  email     String   @unique // Inmutable por lógica de negocio
   password  String
-  name      String?
+  name      String
   
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  // Preferencias
+  currency       String @default("ARS")
+  fiscalStartDay Int    @default(1)
+  
+  // Seguridad & Negocio
+  role         Role             @default(USER)
+  subscription SubscriptionTier @default(FREE) // <--- Nuevo
+  isActive     Boolean          @default(true)
+  lastLogin    DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   deletedAt DateTime? @map("deleted_at")
   
   // Relaciones
@@ -101,6 +121,7 @@ model SavingsAccount {
   targetAmount Decimal?  @db.Decimal(10, 2) // Cuánto quiero juntar (Opcional)
   targetDate   DateTime?                    // Para cuándo (Opcional)
   
+  isDefault    Boolean  @default(false) // <--- Nuevo: Si es true, NO se puede borrar
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

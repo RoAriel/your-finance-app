@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Param,
+  Delete,
+  Patch,
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SavingsService } from './savings.service';
 import { CreateSavingsAccountDto } from './dto/create-saving.dto';
@@ -6,6 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Revisa tu ruta 
 import { CurrentUser } from '../auth/decorators/current-user.decorator'; // Tu decorador arreglado
 import { TransferDto } from './dto/transfer.dto';
 import { DepositDto } from './dto/deposit.dto';
+import { UpdateSavingDto } from './dto/update-saving.dto';
 
 @ApiTags('Savings') // Para agruparlo en Swagger
 @ApiBearerAuth() // Pone el candadito en Swagger
@@ -46,6 +56,22 @@ export class SavingsController {
     @CurrentUser('id') userId: string,
   ) {
     // Pasamos depositDto.amount al servicio
-    return this.savingsService.deposit(id, depositDto.amount, userId);
+    return this.savingsService.deposit(id, depositDto, userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar una meta de ahorro' })
+  remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.savingsService.remove(userId, id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar una meta de ahorro' })
+  update(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateSavingDto, // Asegurate de tener este DTO (o usa CreateSavingsDto con PartialType)
+  ) {
+    return this.savingsService.update(userId, id, dto);
   }
 }

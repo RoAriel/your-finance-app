@@ -7,6 +7,7 @@ import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { CategoriesPage } from './features/categories/pages/CategoriesPage';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { BudgetsPage } from './features/budget/pages/BudgetsPage';
+import { SavingsPage } from './features/savings/pages/SavingsPage';
 import { MainLayout } from './layouts/MainLayout';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/transactions" element={<TransactionsPage />} />
                 <Route path="/budgets" element={<BudgetsPage />} />
+                <Route path="/savings" element={<SavingsPage />} />
               </Route>
             </Route>
 

@@ -1,4 +1,4 @@
-import { IsNumber, IsPositive } from 'class-validator';
+import { IsNumber, IsPositive, IsString, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class DepositDto {
@@ -10,4 +10,9 @@ export class DepositDto {
   @IsNumber()
   @IsPositive()
   amount: number;
+
+  @ApiProperty({ example: 'Ahorro mensual', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }

@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsNumber, IsPositive, IsUUID } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsPositive,
+  IsUUID,
+  IsString,
+  IsOptional,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class TransferDto {
@@ -26,4 +33,13 @@ export class TransferDto {
   @IsNumber()
   @IsPositive()
   amount: number;
+
+  @ApiProperty({
+    description: 'Nota de la transferencia',
+    example: 'Pago de cena',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
 }
