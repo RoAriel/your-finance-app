@@ -222,17 +222,24 @@ export class SavingsService {
     }
   }
 
-  async remove(userId: string, id: string) {
-    // 1. Verificar que la meta exista y pertenezca al usuario
-    const goal = await this.prisma.savingsAccount.findFirst({
-      where: { id, userId },
+  async remove(id: string, userId: string) {
+    // 1. Buscamos la cuenta UNA sola vez
+    const account = await this.prisma.savingsAccount.findUnique({
+      where: { id, userId }, // Prisma se encarga de validar que sea del usuario
     });
 
-    if (!goal) {
-      throw new NotFoundException('Meta de ahorro no encontrada');
+    if (!account) {
+      throw new NotFoundException('Cuenta o Meta no encontrada');
     }
 
-    // 2. Eliminar
+    // 2. REGLA DE NEGOCIO: Protección de cuenta default
+    if (account.isDefault) {
+      throw new BadRequestException(
+        'No puedes eliminar tu cuenta principal por defecto.',
+      );
+    }
+
+    // 3. Eliminar
     return this.prisma.savingsAccount.delete({
       where: { id },
     });
