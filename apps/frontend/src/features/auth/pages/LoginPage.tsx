@@ -3,6 +3,7 @@ import { LogIn, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 // 👇 CAMBIO IMPORTANTE: Ya no importamos authService ni useNavigate directamente
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router-dom';
 
 export const LoginPage = () => {
   // 👇 Usamos el hook
@@ -74,7 +75,7 @@ export const LoginPage = () => {
                 if (error) setError(null); // Borramos error al escribir
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-              placeholder="tu@email.com"
+              placeholder="email@email.com"
             />
           </div>
 
@@ -103,6 +104,26 @@ export const LoginPage = () => {
             {isLoading ? 'Ingresando...' : 'Iniciar Sesión'}
           </button>
         </form>
+        <div className="mt-6 flex flex-col items-center gap-2 text-sm">
+          {/* Link a Registro */}
+          <p className="text-gray-500">
+            ¿No tienes una cuenta?{' '}
+            <Link
+              to="/register"
+              className="font-semibold text-primary hover:text-primary-hover hover:underline transition-colors"
+            >
+              Crear cuenta
+            </Link>
+          </p>
+
+          {/* (Opcional - Best Practice) Link a Recuperar Contraseña */}
+          <Link
+            to="/forgot-password"
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
       </div>
     </div>
   );

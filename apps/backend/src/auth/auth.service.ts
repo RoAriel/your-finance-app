@@ -10,6 +10,68 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
+// 📋 LISTA DE CATEGORÍAS DEFAULT (KIT DE BIENVENIDA)
+const DEFAULT_CATEGORIES = [
+  // INGRESOS
+  {
+    name: 'Sueldo',
+    type: 'INCOME',
+    icon: 'briefcase',
+    color: '#10B981',
+    isFixed: true,
+  },
+  // GASTOS
+  {
+    name: 'Café / Restaurante',
+    type: 'EXPENSE',
+    icon: 'cart',
+    color: '#F59E0B',
+    isFixed: false,
+  },
+  {
+    name: 'Transporte',
+    type: 'EXPENSE',
+    icon: 'bus',
+    color: '#3B82F6',
+    isFixed: false,
+  },
+  {
+    name: 'Servicios',
+    type: 'EXPENSE',
+    icon: 'bulb',
+    color: '#EF4444',
+    isFixed: true,
+  },
+  {
+    name: 'Alquiler / Casa',
+    type: 'EXPENSE',
+    icon: 'home',
+    color: '#8B5CF6',
+    isFixed: true,
+  },
+  {
+    name: 'Ocio / Salidas',
+    type: 'EXPENSE',
+    icon: 'party',
+    color: '#EC4899',
+    isFixed: false,
+  },
+  {
+    name: 'Salud',
+    type: 'EXPENSE',
+    icon: 'heart',
+    color: '#EF4444',
+    isFixed: false,
+  },
+  {
+    name: 'Supermercado',
+    type: 'EXPENSE',
+    icon: 'shopping-cart',
+    color: '#10B981',
+    isFixed: false,
+  },
+];
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -60,7 +122,14 @@ export class AuthService {
           isDefault: true, // 🛡️ ¡Importante! Protegida contra borrado
         },
       });
-
+      // C. Crear Categorías Básica
+      // Usamos createMany para que sea súper eficiente (una sola query)
+      await tx.category.createMany({
+        data: DEFAULT_CATEGORIES.map((cat) => ({
+          ...cat,
+          userId: user.id,
+        })),
+      });
       return user;
     });
 

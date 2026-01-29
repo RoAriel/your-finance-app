@@ -65,6 +65,7 @@ export class QueryTransactionDto extends PaginationDto {
   @Min(2000)
   year?: number;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   accountId: string;

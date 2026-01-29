@@ -1,22 +1,25 @@
 /* eslint-disable react-refresh/only-export-components */
 // 👆 1. Agregamos esta línea para silenciar el error de Fast Refresh
 
-import { createContext, useState } from 'react';
+import { createContext, useState, useContext } from 'react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth.service';
-import type { LoginCredentials } from '../types';
-
-interface User {
-  email: string;
-}
+import type { LoginCredentials, RegisterDto, User } from '../types';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterDto) => Promise<void>; // 👈 NUEVO MÉTODO
   logout: () => void;
 }
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
 
 export const AuthContext = createContext<AuthContextType | undefined>(
   undefined
@@ -35,11 +38,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (credentials: LoginCredentials) => {
     // 👇 2. Corregido: Llamamos al servicio sin guardar 'const response ='
-    await authService.login(credentials);
-
+    const response = await authService.login(credentials);
     setIsAuthenticated(true);
-    setUser({ email: credentials.email });
 
+    setUser(response.user); // 👇 Usamos el usuario real que devuelve el back
+    navigate('/dashboard');
+  };
+
+  const register = async (data: RegisterDto) => {
+    // 1. Llama al servicio (que crea user y guarda token en localStorage)
+    const response = await authService.register(data);
+
+    // 2. Actualiza el estado GLOBAL de React
+    setIsAuthenticated(true);
+    setUser(response.user);
+
+    // 3. Redirige
     navigate('/dashboard');
   };
 
@@ -54,7 +68,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // La seguridad la maneja 'ProtectedRoute.tsx', no este archivo.
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated, login, logout, register }}
+    >
       {children}
     </AuthContext.Provider>
   );

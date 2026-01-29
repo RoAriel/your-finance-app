@@ -338,7 +338,7 @@ export class TransactionsService {
     }
   }
 
-  private async findOne(id: string, userId: string) {
+  async findOne(id: string, userId: string) {
     const transaction = await this.prisma.transaction.findFirst({
       where: { id, userId, deletedAt: null },
       include: { category: true },

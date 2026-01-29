@@ -1,16 +1,13 @@
-// apps/frontend/src/features/auth/services/auth.service.ts
 import { api } from '../../../lib/axios';
-import type { AuthResponse, LoginCredentials } from '../types';
+import type { AuthResponse, LoginCredentials, RegisterDto } from '../types'; // 👈 Agregamos RegisterDto
 import { logger } from '../../../utils/appLogger';
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
     logger.debug('Intentando iniciar sesión', { email: credentials.email });
-    
-    // Llamada al endpoint definido en tu documentacion
+
     const response = await api.post<AuthResponse>('/auth/login', credentials);
-    
-    // Guardamos el token para que el interceptor de Axios lo tome automáticamente
+
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
       logger.success('Login exitoso. Token guardado.');
@@ -19,10 +16,39 @@ export const authService = {
     return response.data;
   },
 
+  // 👇 NUEVO MÉTODO CON LOGGERS
+  register: async (dto: RegisterDto): Promise<AuthResponse> => {
+    // 1. Log de entrada (Debug)
+    logger.debug('Iniciando registro de nuevo usuario', {
+      email: dto.email,
+      currency: dto.currency || 'ARS',
+    });
+
+    // 2. Llamada a la API
+    const response = await api.post<AuthResponse>('/auth/register', dto);
+
+    // 3. Log de éxito
+    // No guardamos el token aquí porque redirigiremos al Login,
+    // pero confirmamos que el proceso terminó bien.
+
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+      logger.success('Registro exitoso. Auto-login activado.', {
+        userId: response.data.user.id,
+      });
+    }
+
+    logger.success('Registro completado con éxito', {
+      email: dto.email,
+      userId: response.data.user.id,
+    });
+
+    return response.data;
+  },
+
   logout: () => {
     localStorage.removeItem('token');
     logger.info('Sesión cerrada');
-    // Aquí podríamos recargar la página o redirigir
-    window.location.href = '/'; 
-  }
+    window.location.href = '/';
+  },
 };
