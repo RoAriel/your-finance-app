@@ -5,7 +5,7 @@ import {
   LogOut,
   Tags,
   Wallet,
-  PiggyBank,
+  HandCoins,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 
@@ -36,8 +36,8 @@ export const Sidebar = () => {
 
     {
       to: '/savings', // ✅ Nuevo link
-      text: 'Ahorros',
-      icon: <PiggyBank size={20} />, // ✅ Nuevo icono
+      text: 'Mis Cuentas',
+      icon: <HandCoins size={20} />, // ✅ Nuevo icono
     },
   ];
 
