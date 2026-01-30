@@ -1,31 +1,36 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Sidebar } from '../components/layout/Sidebar'; // <--- Importamos el nuevo componente
+import { Sidebar } from '../components/layout/Sidebar';
+import { TopBar } from '../components/layout/TopBar'; // Asegúrate de crear este archivo
 
 export const MainLayout = () => {
+  // Estado para controlar si el sidebar está colapsado (Desktop) o abierto (Mobile)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
   return (
-    // 1. CONTENEDOR PADRE
-    <div className="flex h-screen w-full bg-gray-50">
-      {/* 2. SIDEBAR (Ya no está hardcodeado aquí) */}
-      <Sidebar />
+    <div className="flex h-screen w-full bg-gray-50 overflow-hidden">
+      {/* 1. SIDEBAR INTELIGENTE */}
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapse={toggleSidebar}
+      />
 
-      {/* 3. ZONA PRINCIPAL */}
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* A. NAVBAR */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10">
-          <span className="font-semibold text-gray-700">
-            Bienvenido de nuevo 👋
-          </span>
-          {/* Aquí podrías poner un avatar de usuario más tarde */}
-          <div className="h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-xs">
-            RA
+      {/* 2. ZONA PRINCIPAL */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* A. HEADER DELGADO (TopBar) */}
+        <TopBar toggleSidebar={toggleSidebar} />
+
+        {/* B. CONTENIDO DINÁMICO (Outlet) */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-50/50 p-4 md:p-6 scroll-smooth">
+          <div className="max-w-7xl mx-auto h-full min-h-full">
+            <Outlet />
           </div>
-        </header>
-
-        {/* B. CONTENIDO DINÁMICO */}
-        <div className="flex-1 overflow-auto bg-gray-50/50">
-          <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 };
