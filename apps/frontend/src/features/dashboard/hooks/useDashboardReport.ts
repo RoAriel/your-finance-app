@@ -20,9 +20,17 @@ const getDashboardReport = async ({ month, year }: Filters) => {
 
 export const useDashboardReport = (filters: Filters) => {
   return useQuery({
-    queryKey: ['dashboard-report', filters],
-    queryFn: () => getDashboardReport(filters),
-    // Esto mantiene los datos viejos mientras cargan los nuevos (mejor UX)
+    // 1. CORRECCIÓN DE LLAVE: Usamos 'dashboard' para coincidir con la invalidación
+    // Si prefieres 'dashboard-report', debes cambiarlo también en useTransactions.ts
+    queryKey: ['dashboard', filters],
+
+    // 2. LOGS TÁCTICOS INTEGRADOS
+    queryFn: async () => {
+      const data = await getDashboardReport(filters);
+
+      return data;
+    },
+
     placeholderData: (previousData) => previousData,
   });
 };

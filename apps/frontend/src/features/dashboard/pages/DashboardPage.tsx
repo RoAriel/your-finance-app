@@ -99,7 +99,12 @@ export const DashboardPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Columna Izquierda: Stats y Gráfico (Ocupa 2/3) */}
         <div className="lg:col-span-2 space-y-6">
-          <StatsCards />
+          <StatsCards
+            income={reportData?.summary?.income || 0}
+            expenses={reportData?.summary?.expense || 0} // Nota: Tu backend devuelve 'expense' en singular
+            balance={reportData?.summary?.totalAvailable || 0}
+            isLoading={isLoadingReport}
+          />
           <BudgetAlertsWidget month={filters.month} year={filters.year} />
 
           {reportData?.expensesAnalysis && (

@@ -8,7 +8,7 @@ export const useCategories = () => {
   // 1. EL QUERY (Lo que tenías antes)
   const query = useQuery({
     queryKey: ['categories'],
-    queryFn: categoriesService.getAll,
+    queryFn: () => categoriesService.getAll(),
     // ¡Mantenemos tu optimización! 🚀
     staleTime: 1000 * 60 * 10, // 10 minutos sin volver a pedir al servidor
   });
