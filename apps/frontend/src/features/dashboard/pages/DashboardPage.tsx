@@ -12,6 +12,8 @@ import { FinancialHealthWidget } from '../components/FinancialHealthWidget';
 import { BudgetAlertsWidget } from '../components/BudgetAlertsWidget';
 import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
 import type { Transaction } from '../../transactions/types';
+import { useAccounts } from '../../accounts/hooks/useAccounts';
+import { AccountType } from '../../accounts/types';
 
 export const DashboardPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -37,6 +39,13 @@ export const DashboardPage = () => {
   const { data: reportData, isLoading: isLoadingReport } =
     useDashboardReport(filters);
 
+  const { accounts: wallets, isLoading: isLoadingWallets } = useAccounts({
+    type: AccountType.WALLET,
+  });
+  const totalAvailableLiquidity = wallets.reduce(
+    (acc, curr) => acc + Number(curr.balance),
+    0
+  );
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
@@ -101,9 +110,11 @@ export const DashboardPage = () => {
         <div className="lg:col-span-2 space-y-6">
           <StatsCards
             income={reportData?.summary?.income || 0}
-            expenses={reportData?.summary?.expense || 0} // Nota: Tu backend devuelve 'expense' en singular
-            balance={reportData?.summary?.totalAvailable || 0}
-            isLoading={isLoadingReport}
+            expenses={reportData?.summary?.expense || 0}
+            // Aquí inyectamos el saldo calculado en frontend (o usamos el del reporte si prefieres)
+            // Según tu regla de negocio 2: "Mostrar Dinero Disponible (Suma de balances de wallets)"
+            balance={totalAvailableLiquidity}
+            isLoading={isLoadingReport || isLoadingWallets}
           />
           <BudgetAlertsWidget month={filters.month} year={filters.year} />
 

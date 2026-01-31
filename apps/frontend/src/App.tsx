@@ -7,7 +7,7 @@ import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { CategoriesPage } from './features/categories/pages/CategoriesPage';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { BudgetsPage } from './features/budget/pages/BudgetsPage';
-import { SavingsPage } from './features/savings/pages/SavingsPage';
+import { SavingsPage } from './features/accounts/pages/SavingsPage';
 import { RegisterPage } from './features/auth/pages/RegisterPage';
 import { MainLayout } from './layouts/MainLayout';
 

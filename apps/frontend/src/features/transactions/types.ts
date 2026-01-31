@@ -18,6 +18,7 @@ export interface Transaction {
   date: string; // ISO String ("2026-01-18T...")
   categoryId: string;
   category?: TransactionCategory; // Puede venir o no, según el backend
+  accountId: string;
   createdAt: string;
 }
 
@@ -47,6 +48,7 @@ export interface CreateTransactionDTO {
   amount: number;
   description: string;
   categoryId: string;
+  accountId: string; // 👈 AGREGADO: Campo obligatorio en el nuevo modelo
   date: string;
   type: 'income' | 'expense';
   currency: string;

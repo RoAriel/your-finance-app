@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { logger } from '../utils/appLogger';
-
+console.log('🔗 API URL configurada:', import.meta.env.VITE_API_URL);
 // 1. Crear instancia base
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,

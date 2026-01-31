@@ -5,8 +5,10 @@ import {
   useUpdateTransaction,
 } from '../hooks/useTransactions';
 import type { Transaction } from '../types';
-// Ajusta esta ruta si tu CategorySelector está en otra carpeta
 import { CategorySelector } from '../../../components/common/CategorySelector';
+// 👇 Importamos el nuevo selector y tipos
+import { AccountSelector } from '../../../components/common/AccountSelector';
+import { AccountType } from '../../accounts/types';
 
 interface Props {
   isOpen: boolean;
@@ -25,47 +27,43 @@ export const CreateTransactionModal = ({
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
-  // 1. Inicialización de Estados
-  // Gracias a la prop 'key' en el padre, esto se reinicia cada vez que abres el modal
+  // ESTADOS
   const [type, setType] = useState<Transaction['type']>(
     transactionToEdit?.type || 'expense'
   );
-
   const [amount, setAmount] = useState(
     transactionToEdit?.amount?.toString() || ''
   );
-
-  // Usamos la moneda de la transacción si existe, sino por defecto ARS
   const [currency, setCurrency] = useState(
     transactionToEdit?.currency || 'ARS'
   );
-
   const [description, setDescription] = useState(
     transactionToEdit?.description || ''
   );
-
-  // Si venía null del backend (tu error anterior), aquí se inicia como ''
   const [categoryId, setCategoryId] = useState(
     transactionToEdit?.categoryId || ''
   );
+  // 👇 Nuevo estado para la Cuenta
+  const [accountId, setAccountId] = useState(
+    transactionToEdit?.accountId || ''
+  );
 
-  // Manejo seguro de fechas para el input type="date"
+  // Fecha
   const initialDate = transactionToEdit?.date
     ? new Date(transactionToEdit.date).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
   const [date, setDate] = useState(initialDate);
 
-  // 2. Lógica de Cambio de Tipo
   const handleTypeChange = (newType: Transaction['type']) => {
     setType(newType);
-    setCategoryId(''); // Reseteamos categoría para evitar inconsistencias
+    setCategoryId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validación estricta: No deja guardar sin categoría
-    if (!amount || !categoryId || !description) return;
+    // 👇 Validamos accountId
+    if (!amount || !categoryId || !description || !accountId) return;
 
     const transactionData = {
       amount: parseFloat(amount),
@@ -73,13 +71,13 @@ export const CreateTransactionModal = ({
       date: new Date(date).toISOString(),
       type: type as 'income' | 'expense',
       categoryId,
+      accountId, // 👈 Enviamos la cuenta seleccionada
       currency,
     };
 
     const options = {
       onSuccess: () => {
         onClose();
-        // Opcional: Aquí podrías disparar un toast de éxito
       },
     };
 
@@ -105,22 +103,23 @@ export const CreateTransactionModal = ({
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600"
           >
             <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Tabs de Tipo (Ingreso / Gasto) */}
+          {/* Tabs Tipo */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
+            {/* ... (código de tabs igual que antes) ... */}
             <button
               type="button"
               onClick={() => handleTypeChange('expense')}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
                 type === 'expense'
                   ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-gray-500'
               }`}
             >
               Gasto
@@ -131,34 +130,40 @@ export const CreateTransactionModal = ({
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
                 type === 'income'
                   ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-gray-500'
               }`}
             >
               Ingreso
             </button>
           </div>
 
+          {/* 👇 Selector de Cuenta (NUEVO) */}
+          {/* Filtramos solo WALLET porque normalmente gastas/cobras en billeteras */}
+          <AccountSelector
+            value={accountId}
+            onChange={setAccountId}
+            type={AccountType.WALLET}
+            label={type === 'income' ? 'Destino (Cuenta)' : 'Origen (Cuenta)'}
+            placeholder="Selecciona la cuenta..."
+          />
+
+          {/* Monto y Moneda */}
           <div className="grid grid-cols-3 gap-4">
-            {/* Input Monto */}
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Monto
               </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  required
-                  min="0.01"
-                  step="0.01"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
-                  placeholder="0.00"
-                />
-              </div>
+              <input
+                type="number"
+                required
+                min="0.01"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                placeholder="0.00"
+              />
             </div>
-
-            {/* Selector Moneda */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Moneda
@@ -166,7 +171,7 @@ export const CreateTransactionModal = ({
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white"
+                className="w-full px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
               >
                 <option value="ARS">ARS 🇦🇷</option>
                 <option value="USD">USD 🇺🇸</option>
@@ -175,7 +180,7 @@ export const CreateTransactionModal = ({
             </div>
           </div>
 
-          {/* Selector de Categoría (EL FIX PRINCIPAL) */}
+          {/* Categoría */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Categoría
@@ -188,7 +193,7 @@ export const CreateTransactionModal = ({
             />
           </div>
 
-          {/* Input Descripción */}
+          {/* Descripción y Fecha (Igual que antes) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Descripción
@@ -198,12 +203,9 @@ export const CreateTransactionModal = ({
               required
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
-              placeholder="Ej: Compras del mes"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
-
-          {/* Input Fecha */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha
@@ -213,15 +215,16 @@ export const CreateTransactionModal = ({
               required
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-shadow"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
 
+          {/* Botón Submit */}
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm shadow-primary/30"
+              disabled={isLoading || !accountId} // 👈 Bloqueamos si no hay cuenta
+              className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {isLoading
                 ? 'Guardando...'
