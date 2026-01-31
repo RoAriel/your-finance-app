@@ -7,7 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma, Transaction } from '@prisma/client';
 import {
   CreateTransactionDto,
-  TransactionType, // 👈 IMPORTANTE: Usamos el Enum del DTO
+  TransactionType,
 } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { QueryTransactionDto } from './dto/query-transaction.dto';
@@ -24,9 +24,6 @@ export class TransactionsService {
 
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Crea una transacción y actualiza el saldo de la cuenta atómicamente
-   */
   async create(dto: CreateTransactionDto, userId: string) {
     const { accountId, amount, type, ...rest } = dto;
 
@@ -37,8 +34,9 @@ export class TransactionsService {
       userId,
     });
 
-    // 1. Validar Cuenta
-    const account = await this.prisma.savingsAccount.findUnique({
+    // 1. Validar Cuenta (Account)
+    // Usamos findFirst para asegurar que sea del usuario
+    const account = await this.prisma.account.findFirst({
       where: { id: accountId, userId },
     });
 
@@ -55,24 +53,23 @@ export class TransactionsService {
           data: {
             ...rest,
             amount,
-            type, // Aquí entra como 'income' o 'expense' (valores del Enum)
+            type,
             userId,
-            savingsAccountId: accountId, // Mapeo DTO -> Schema
+            accountId,
             currency: account.currency,
           },
           include: {
             category: true,
-            savingsAccount: true,
+            account: true,
           },
         });
 
-        // B. Calcular impacto en el saldo
-        // ✅ COMPARACIÓN CORRECTA: Ambos lados son del tipo Enum TransactionType
+        // B. Calcular impacto
         const operation =
           type === TransactionType.INCOME ? 'increment' : 'decrement';
 
         // C. Actualizar la cuenta
-        await tx.savingsAccount.update({
+        await tx.account.update({
           where: { id: accountId },
           data: {
             balance: {
@@ -86,9 +83,7 @@ export class TransactionsService {
 
       this.logger.logSuccess('Create transaction', {
         id: result.id,
-        newBalance: result.savingsAccount
-          ? Number(result.savingsAccount.balance)
-          : 0,
+        newBalance: Number(result.account?.balance || 0),
       });
 
       return result;
@@ -98,9 +93,6 @@ export class TransactionsService {
     }
   }
 
-  /**
-   * Lista transacciones con filtros
-   */
   async findAll(
     query: QueryTransactionDto,
     userId: string,
@@ -112,7 +104,7 @@ export class TransactionsService {
       startDate,
       endDate,
       categoryId,
-      accountId, // Este es obligatorio en tu DTO
+      accountId,
       year,
       month,
       search,
@@ -127,9 +119,7 @@ export class TransactionsService {
       deletedAt: null,
     };
 
-    // Mapeo de filtros
-    if (accountId) where.savingsAccountId = accountId;
-    // TypeScript permite asignar el Enum al String de Prisma porque los valores coinciden
+    if (accountId) where.accountId = accountId;
     if (type) where.type = type;
     if (categoryId) where.categoryId = categoryId;
 
@@ -164,7 +154,7 @@ export class TransactionsService {
           take: limit,
           include: {
             category: true,
-            savingsAccount: true,
+            account: true,
           },
           orderBy: { date: 'desc' },
         }),
@@ -183,14 +173,11 @@ export class TransactionsService {
     }
   }
 
-  /**
-   * Calcula el balance global
-   */
   async getBalance(userId: string) {
     this.logger.log(`Calculating global balance for user ${userId}`);
 
     try {
-      const accounts = await this.prisma.savingsAccount.findMany({
+      const accounts = await this.prisma.account.findMany({
         where: { userId },
         select: { balance: true, currency: true },
       });
@@ -216,15 +203,12 @@ export class TransactionsService {
     }
   }
 
-  /**
-   * Actualiza transacción y reajusta saldos
-   */
   async update(id: string, dto: UpdateTransactionDto, userId: string) {
     this.logger.logOperation('Update transaction', { id, userId });
 
     const oldTransaction = await this.findOne(id, userId);
 
-    if (!oldTransaction.savingsAccountId) {
+    if (!oldTransaction.accountId) {
       throw new BadRequestException(
         'La transacción original no tiene una cuenta asociada válida.',
       );
@@ -233,32 +217,29 @@ export class TransactionsService {
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         // 1. REVERTIR el impacto anterior
-        // ✅ TRUCO LIMPIO: Casteamos el valor de la BD (string) al Enum para compararlo
         const oldType = oldTransaction.type as TransactionType;
         const reverseOp =
           oldType === TransactionType.INCOME ? 'decrement' : 'increment';
 
-        await tx.savingsAccount.update({
-          where: { id: oldTransaction.savingsAccountId! },
+        await tx.account.update({
+          // 🛡️ CORRECCIÓN 1: Usamos "!" porque ya validamos arriba que accountId existe
+          where: { id: oldTransaction.accountId! },
           data: { balance: { [reverseOp]: oldTransaction.amount } },
         });
 
         // 2. APLICAR nueva transacción
         const newAmount =
           dto.amount !== undefined ? dto.amount : oldTransaction.amount;
-        // Si viene tipo nuevo lo usamos, si no, casteamos el viejo
         const newType = dto.type
           ? dto.type
           : (oldTransaction.type as TransactionType);
 
-        const newAccountId = dto.accountId || oldTransaction.savingsAccountId!;
+        // 🛡️ CORRECCIÓN 2: Usamos "!" porque si no viene en DTO, usamos el viejo (que ya sabemos que existe)
+        const newAccountId = dto.accountId || oldTransaction.accountId!;
 
-        // Cambio de cuenta
-        if (
-          dto.accountId &&
-          dto.accountId !== oldTransaction.savingsAccountId
-        ) {
-          const newAccount = await tx.savingsAccount.findUnique({
+        // Cambio de cuenta (si aplica)
+        if (dto.accountId && dto.accountId !== oldTransaction.accountId) {
+          const newAccount = await tx.account.findFirst({
             where: { id: dto.accountId, userId },
           });
           if (!newAccount)
@@ -268,7 +249,8 @@ export class TransactionsService {
         const applyOp =
           newType === TransactionType.INCOME ? 'increment' : 'decrement';
 
-        await tx.savingsAccount.update({
+        await tx.account.update({
+          // 🛡️ CORRECCIÓN 3: newAccountId ahora es string seguro gracias a la corrección 2
           where: { id: newAccountId },
           data: { balance: { [applyOp]: newAmount } },
         });
@@ -278,7 +260,7 @@ export class TransactionsService {
           where: { id },
           data: {
             ...dto,
-            savingsAccountId: dto.accountId, // Mapeo DTO -> Schema
+            accountId: dto.accountId,
           },
           include: { category: true },
         });
@@ -292,15 +274,12 @@ export class TransactionsService {
     }
   }
 
-  /**
-   * Elimina y revierte saldo
-   */
   async remove(id: string, userId: string) {
     this.logger.logOperation('Delete transaction', { id, userId });
 
     const transaction = await this.findOne(id, userId);
 
-    if (!transaction.savingsAccountId) {
+    if (!transaction.accountId) {
       throw new BadRequestException(
         'La transacción no tiene una cuenta asociada para revertir el saldo.',
       );
@@ -309,13 +288,13 @@ export class TransactionsService {
     try {
       await this.prisma.$transaction(async (tx) => {
         // 1. Revertir saldo
-        // ✅ TRUCO LIMPIO: Casteamos DB String -> Enum
         const typeEnum = transaction.type as TransactionType;
         const operation =
           typeEnum === TransactionType.INCOME ? 'decrement' : 'increment';
 
-        await tx.savingsAccount.update({
-          where: { id: transaction.savingsAccountId! },
+        await tx.account.update({
+          // 🛡️ CORRECCIÓN 4: Usamos "!" para asegurar que no es null
+          where: { id: transaction.accountId! },
           data: {
             balance: { [operation]: transaction.amount },
           },

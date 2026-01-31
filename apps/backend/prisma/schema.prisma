@@ -18,12 +18,20 @@ enum SubscriptionTier {
   PRO
 }
 
+// 👇 NUEVO ENUM (Identidad de la cuenta)
+enum AccountType {
+  WALLET        // Efectivo, Banco, Billetera Virtual (Flujo diario)
+  SAVINGS       // Metas, Ahorros (Acumulación)
+  INVESTMENT    // Inversiones
+  CREDIT_CARD   // Tarjetas de Crédito (Futuro)
+}
+
 // ===========================================
 // USER MODEL
 // ===========================================
 model User {
   id        String   @id @default(uuid())
-  email     String   @unique // Inmutable por lógica de negocio
+  email     String   @unique
   password  String
   name      String
   
@@ -32,10 +40,10 @@ model User {
   fiscalStartDay Int    @default(1)
   
   // Seguridad & Negocio
-  role         Role             @default(USER)
-  subscription SubscriptionTier @default(FREE) // <--- Nuevo
-  isActive     Boolean          @default(true)
-  lastLogin    DateTime?
+  role           Role             @default(USER)
+  subscription   SubscriptionTier @default(FREE)
+  isActive       Boolean          @default(true)
+  lastLogin      DateTime?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -44,8 +52,8 @@ model User {
   // Relaciones
   transactions Transaction[]
   categories   Category[]
-  savingsAccounts SavingsAccount[]
-  budgets Budget[]
+  accounts     Account[]      // 👈 Renombramos la relación (antes savingsAccounts)
+  budgets      Budget[]
   
   @@map("users")
 }
@@ -62,7 +70,9 @@ model Transaction {
   description String?   @db.Text
   date        DateTime  @default(now())
   categoryId  String?   @map("category_id")
-  savingsAccountId String?  // <--- Opcional (porque puede ser un gasto en efectivo)
+  
+  // 👇 CAMBIO: Ahora apunta a Account y se llama accountId
+  accountId   String?   @map("account_id") 
   
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
@@ -71,9 +81,9 @@ model Transaction {
   // Relaciones
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  savingsAccount   SavingsAccount? @relation(fields: [savingsAccountId], references: [id])
+  account  Account?  @relation(fields: [accountId], references: [id]) // 👈 Relación actualizada
   
-  // Índices para mejorar performance
+  // Índices
   @@index([userId])
   @@index([date])
   @@index([categoryId])
@@ -85,13 +95,13 @@ model Transaction {
 // CATEGORY MODEL
 // ===========================================
 model Category {
-  id     String  @id @default(uuid())
-  userId String  @map("user_id")
-  name   String
-  type   String  // 'income' | 'expense' | 'both'
-  isFixed   Boolean  @default(false)
-  color  String? // Hex color para UI (ej: "#FF5733")
-  icon   String? // Nombre del ícono para UI
+  id      String  @id @default(uuid())
+  userId  String  @map("user_id")
+  name    String
+  type    String  // 'income' | 'expense' | 'both'
+  isFixed Boolean @default(false)
+  color   String? 
+  icon    String? 
   
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
@@ -100,53 +110,53 @@ model Category {
   // Relaciones
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
-  budgets Budget[]
+  budgets      Budget[]
   
-  // Constraints
   @@unique([userId, name, type])
   @@index([userId])
   @@map("categories")
 }
 
 // ===========================================
-// SAVINGS ACCOUNT MODEL
+// ACCOUNT MODEL (Antes SavingsAccount)
 // ===========================================
-model SavingsAccount {
-  id        String   @id @default(uuid())
-  name      String   // Ej: "Fondo de Emergencia", "Viaje a Japón"
-  currency  String   @default("ARS") // O podrías usar un Enum si quieres ser estricto
-  balance   Decimal  @default(0) @db.Decimal(15, 2) // 15 dígitos total, 2 decimales
-  color     String?  // Hex code para el frontend (ej: #FF5733)
-  icon      String   @default("wallet")
-  targetAmount Decimal?  @db.Decimal(10, 2) // Cuánto quiero juntar (Opcional)
-  targetDate   DateTime?                    // Para cuándo (Opcional)
+model Account {
+  id           String      @id @default(uuid())
+  name         String      
+  type         AccountType @default(WALLET) // 👈 Identidad de la cuenta
+  currency     String      @default("ARS") 
+  balance      Decimal     @default(0) @db.Decimal(15, 2) 
+  color        String?     
+  icon         String      @default("wallet")
   
-  isDefault    Boolean  @default(false) // <--- Nuevo: Si es true, NO se puede borrar
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Campos opcionales (Sentido semántico para SAVINGS)
+  targetAmount Decimal?    @db.Decimal(10, 2) 
+  targetDate   DateTime?   
+  
+  isDefault    Boolean     @default(false) 
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   //Relaciones
-  transactions Transaction[] // <--- Una cuenta tiene muchas transacciones
+  transactions Transaction[] 
 
-  // Constraints
-  @@map("savings_accounts") // Buena práctica: nombres de tablas en plural/snake_case en la BD
+  @@map("accounts") // 👈 Tabla renombrada a plural genérico
 }
 
 // ===========================================
 // BUDGET MODEL
 // ===========================================
 model Budget {
-  id        String   @id @default(uuid())
-  amount    Decimal  @db.Decimal(10, 2) // Límite de gasto
-  month     Int      // 1 al 12
-  year      Int      // 2026, etc.
+  id         String  @id @default(uuid())
+  amount     Decimal @db.Decimal(10, 2)
+  month      Int     
+  year       Int     
 
-  // Relaciones
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -154,7 +164,6 @@ model Budget {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // 🔒 Candado de seguridad: Un solo presupuesto por categoría/mes/año
   @@unique([userId, categoryId, month, year])
   @@map("budgets")
 }

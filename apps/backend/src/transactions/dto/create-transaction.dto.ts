@@ -70,6 +70,11 @@ export class CreateTransactionDto {
   @IsOptional()
   categoryId?: string;
 
+  @ApiProperty({
+    description:
+      'ID de la cuenta (Wallet o Savings) donde impacta el movimiento',
+    example: 'uuid-de-la-cuenta',
+  })
   @IsString()
   @IsNotEmpty()
   accountId: string;

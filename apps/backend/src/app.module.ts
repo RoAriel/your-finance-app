@@ -5,7 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { CategoriesModule } from './categories/categories.module';
-import { SavingsModule } from './savings/savings.module';
+import { AccountsModule } from './account/accounts.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ReportsModule } from './reports/reports.module';
 import { UsersModule } from './user/users.module';
@@ -16,7 +16,7 @@ import { UsersModule } from './user/users.module';
     AuthModule,
     TransactionsModule,
     CategoriesModule,
-    SavingsModule,
+    AccountsModule,
     BudgetsModule,
     ReportsModule,
     UsersModule,

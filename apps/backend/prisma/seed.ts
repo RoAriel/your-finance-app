@@ -1,17 +1,22 @@
-import { PrismaClient, Role, SubscriptionTier } from '@prisma/client';
+import {
+  PrismaClient,
+  Role,
+  SubscriptionTier,
+  AccountType,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'admin@admin'; // Tu email de Admin
+  const email = 'admin@admin';
 
   // 1. Verificar si ya existe
   const existingAdmin = await prisma.user.findUnique({ where: { email } });
 
   if (!existingAdmin) {
     console.log('⚡ Creando usuario Admin...');
-    const hashedPassword = await bcrypt.hash('admin', 10); // Tu password inicial
+    const hashedPassword = await bcrypt.hash('admin', 10);
 
     // 2. Crear Admin + Cuenta Default protegida
     await prisma.user.create({
@@ -19,17 +24,18 @@ async function main() {
         email,
         name: 'Super Admin',
         password: hashedPassword,
-        role: Role.ADMIN, // 👈 Importante
-        subscription: SubscriptionTier.PRO, // El Admin merece ser PRO
+        role: Role.ADMIN,
+        subscription: SubscriptionTier.PRO,
         currency: 'ARS',
         fiscalStartDay: 1,
-        savingsAccounts: {
+        accounts: {
           create: {
             name: 'Caja Chica (Admin)',
+            type: AccountType.WALLET, // 👈 Definimos el tipo
             currency: 'ARS',
             icon: 'shield-check',
             color: '#000000',
-            isDefault: true, // 👈 Protegida contra borrado
+            isDefault: true,
           },
         },
       },

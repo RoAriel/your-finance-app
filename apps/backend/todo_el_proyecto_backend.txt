@@ -1,0 +1,4030 @@
+
+--- FIN ARCHIVO: package.json ---
+
+
+--- INICIO ARCHIVO: prisma\prisma.module.ts ---
+
+import { Module, Global } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Global()
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class PrismaModule {}
+
+
+--- FIN ARCHIVO: prisma\prisma.module.ts ---
+
+
+--- INICIO ARCHIVO: prisma\prisma.service.ts ---
+
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
+  async onModuleInit() {
+    await this.$connect(); // Abre la conexión a PostgreSQL
+    console.log('✅ Conectado a la base de datos');
+  }
+
+  async onModuleDestroy() {
+    await this.$disconnect(); // Cierra la conexión limpiamente
+    console.log('👋 Desconectado de la base de datos');
+  }
+}
+
+
+--- FIN ARCHIVO: prisma\prisma.service.ts ---
+
+
+--- INICIO ARCHIVO: prisma\schema.prisma ---
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+// 👇 NUEVO ENUM (Identidad de la cuenta)
+enum AccountType {
+  WALLET        // Efectivo, Banco, Billetera Virtual (Flujo diario)
+  SAVINGS       // Metas, Ahorros (Acumulación)
+  INVESTMENT    // Inversiones
+  CREDIT_CARD   // Tarjetas de Crédito (Futuro)
+}
+
+// ===========================================
+// USER MODEL
+// ===========================================
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  
+  // Preferencias
+  currency       String @default("ARS")
+  fiscalStartDay Int    @default(1)
+  
+  // Seguridad & Negocio
+  role           Role             @default(USER)
+  subscription   SubscriptionTier @default(FREE)
+  isActive       Boolean          @default(true)
+  lastLogin      DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? @map("deleted_at")
+  
+  // Relaciones
+  transactions Transaction[]
+  categories   Category[]
+  accounts     Account[]      // 👈 Renombramos la relación (antes savingsAccounts)
+  budgets      Budget[]
+  
+  @@map("users")
+}
+
+// ===========================================
+// TRANSACTION MODEL
+// ===========================================
+model Transaction {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  type        String    // 'income' | 'expense'
+  amount      Decimal   @db.Decimal(15, 2)
+  currency    String    @default("ARS")
+  description String?   @db.Text
+  date        DateTime  @default(now())
+  categoryId  String?   @map("category_id")
+  
+  // 👇 CAMBIO: Ahora apunta a Account y se llama accountId
+  accountId   String?   @map("account_id") 
+  
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+  
+  // Relaciones
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account  Account?  @relation(fields: [accountId], references: [id]) // 👈 Relación actualizada
+  
+  // Índices
+  @@index([userId])
+  @@index([date])
+  @@index([categoryId])
+  @@index([type])
+  @@map("transactions")
+}
+
+// ===========================================
+// CATEGORY MODEL
+// ===========================================
+model Category {
+  id      String  @id @default(uuid())
+  userId  String  @map("user_id")
+  name    String
+  type    String  // 'income' | 'expense' | 'both'
+  isFixed Boolean @default(false)
+  color   String? 
+  icon    String? 
+  
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+  
+  // Relaciones
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+  
+  @@unique([userId, name, type])
+  @@index([userId])
+  @@map("categories")
+}
+
+// ===========================================
+// ACCOUNT MODEL (Antes SavingsAccount)
+// ===========================================
+model Account {
+  id           String      @id @default(uuid())
+  name         String      
+  type         AccountType @default(WALLET) // 👈 Identidad de la cuenta
+  currency     String      @default("ARS") 
+  balance      Decimal     @default(0) @db.Decimal(15, 2) 
+  color        String?     
+  icon         String      @default("wallet")
+  
+  // Campos opcionales (Sentido semántico para SAVINGS)
+  targetAmount Decimal?    @db.Decimal(10, 2) 
+  targetDate   DateTime?   
+  
+  isDefault    Boolean     @default(false) 
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  //Relaciones
+  transactions Transaction[] 
+
+  @@map("accounts") // 👈 Tabla renombrada a plural genérico
+}
+
+// ===========================================
+// BUDGET MODEL
+// ===========================================
+model Budget {
+  id         String  @id @default(uuid())
+  amount     Decimal @db.Decimal(10, 2)
+  month      Int     
+  year       Int     
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, categoryId, month, year])
+  @@map("budgets")
+}
+
+--- FIN ARCHIVO: prisma\schema.prisma ---
+
+
+--- INICIO ARCHIVO: prisma\seed.ts ---
+
+import {
+  PrismaClient,
+  Role,
+  SubscriptionTier,
+  AccountType,
+} from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const email = 'admin@admin';
+
+  // 1. Verificar si ya existe
+  const existingAdmin = await prisma.user.findUnique({ where: { email } });
+
+  if (!existingAdmin) {
+    console.log('⚡ Creando usuario Admin...');
+    const hashedPassword = await bcrypt.hash('admin', 10);
+
+    // 2. Crear Admin + Cuenta Default protegida
+    await prisma.user.create({
+      data: {
+        email,
+        name: 'Super Admin',
+        password: hashedPassword,
+        role: Role.ADMIN,
+        subscription: SubscriptionTier.PRO,
+        currency: 'ARS',
+        fiscalStartDay: 1,
+        accounts: {
+          create: {
+            name: 'Caja Chica (Admin)',
+            type: AccountType.WALLET, // 👈 Definimos el tipo
+            currency: 'ARS',
+            icon: 'shield-check',
+            color: '#000000',
+            isDefault: true,
+          },
+        },
+      },
+    });
+    console.log(`✅ Admin creado exitosamente: ${email} / admin123`);
+  } else {
+    console.log('ℹ️ El usuario Admin ya existe. No se hicieron cambios.');
+  }
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+
+
+--- FIN ARCHIVO: prisma\seed.ts ---
+
+
+--- INICIO ARCHIVO: src\account\accounts.controller.ts ---
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Param,
+  Delete,
+  Patch,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { AccountsService } from './accounts.service'; // 👈 Renombrado
+import { CreateAccountDto } from './dto/create-account.dto'; // 👈 Renombrado
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { TransferDto } from './dto/transfer.dto';
+import { DepositDto } from './dto/deposit.dto';
+import { UpdateAccountDto } from './dto/update-account.dto'; // 👈 Renombrado
+
+@ApiTags('Accounts') // 👈 Etiqueta actualizada para Swagger
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('accounts') // 👈 Ruta actualizada: /accounts
+export class AccountsController {
+  constructor(private readonly accountsService: AccountsService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Crear una nueva cuenta (Wallet o Savings)' })
+  create(@Body() dto: CreateAccountDto, @CurrentUser('id') userId: string) {
+    return this.accountsService.create(dto, userId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Listar todas las cuentas' })
+  findAll(@CurrentUser('id') userId: string) {
+    return this.accountsService.findAll(userId);
+  }
+
+  @Post('transfer')
+  @ApiOperation({ summary: 'Transferir entre cuentas' })
+  transfer(@Body() dto: TransferDto, @CurrentUser('id') userId: string) {
+    return this.accountsService.transfer(dto, userId);
+  }
+
+  @Post(':id/deposit')
+  @ApiOperation({ summary: 'Depositar fondos (Test)' })
+  deposit(
+    @Param('id') id: string,
+    @Body() dto: DepositDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.accountsService.deposit(id, dto, userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar una cuenta' })
+  remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.accountsService.remove(userId, id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar una cuenta' })
+  update(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateAccountDto,
+  ) {
+    return this.accountsService.update(userId, id, dto);
+  }
+}
+
+
+--- FIN ARCHIVO: src\account\accounts.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\account\accounts.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { AccountsService } from './accounts.service';
+import { AccountsController } from './accounts.controller';
+
+@Module({
+  controllers: [AccountsController],
+  providers: [AccountsService],
+  exports: [AccountsService], // Es buena práctica exportarlo por si otro módulo lo necesita
+})
+export class AccountsModule {}
+
+
+--- FIN ARCHIVO: src\account\accounts.module.ts ---
+
+
+--- INICIO ARCHIVO: src\account\accounts.service.ts ---
+
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateAccountDto } from './dto/create-account.dto';
+import { AppLogger } from '../common/utils/logger.util';
+import { TransferDto } from './dto/transfer.dto';
+// Asegúrate de importar TransactionType correctamente
+import { TransactionType } from '../transactions/dto/create-transaction.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
+import { DepositDto } from './dto/deposit.dto';
+
+@Injectable()
+export class AccountsService {
+  private readonly logger = new AppLogger(AccountsService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(dto: CreateAccountDto, userId: string) {
+    const operation = 'Crear Cuenta';
+    try {
+      this.logger.logOperation(operation, { userId, type: dto.type });
+
+      // 👇 Usamos prisma.account
+      const account = await this.prisma.account.create({
+        data: {
+          ...dto,
+          userId,
+          balance: 0,
+        },
+      });
+
+      this.logger.logSuccess(operation, { id: account.id });
+      return account;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  async findAll(userId: string) {
+    const operation = 'Listar Cuentas';
+    try {
+      this.logger.logOperation(operation, { userId });
+
+      // 👇 Usamos prisma.account
+      const accounts = await this.prisma.account.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'asc' }, // Orden cronológico
+      });
+
+      this.logger.logSuccess(operation, { count: accounts.length });
+
+      // Mapeo para calcular Progreso (útil para SAVINGS)
+      return accounts.map((acc) => {
+        const balance = Number(acc.balance);
+        const targetAmount = acc.targetAmount ? Number(acc.targetAmount) : 0;
+        let progress = 0;
+
+        if (targetAmount > 0) {
+          progress = Math.min((balance / targetAmount) * 100, 100);
+        }
+
+        return {
+          ...acc,
+          balance, // Convertido a Number
+          targetAmount: targetAmount > 0 ? targetAmount : null,
+          progress: Math.round(progress),
+        };
+      });
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  async deposit(accountId: string, dto: DepositDto, userId: string) {
+    const operation = 'Depositar Fondos';
+    const { amount, description } = dto;
+
+    try {
+      this.logger.logOperation(operation, { accountId, amount });
+
+      const account = await this.prisma.account.findUnique({
+        where: { id: accountId },
+      });
+
+      if (!account) throw new NotFoundException('Account not found');
+      if (account.userId !== userId)
+        throw new ForbiddenException('Not your account');
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        // A. Actualizar saldo
+        const updatedAccount = await tx.account.update({
+          where: { id: accountId },
+          data: { balance: { increment: amount } },
+        });
+
+        // B. Crear Transaction
+        await tx.transaction.create({
+          data: {
+            amount: amount,
+            description: description || 'Depósito manual',
+            date: new Date(),
+            type: TransactionType.INCOME, // Asegúrate que coincida con tu Enum
+            userId,
+            accountId: accountId, // 👈 CAMBIO CRÍTICO: accountId
+            currency: account.currency, // Buena práctica agregar la moneda
+          },
+        });
+
+        return updatedAccount;
+      });
+
+      this.logger.logSuccess(operation, { newBalance: result.balance });
+      return result;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  async transfer(dto: TransferDto, userId: string) {
+    const operation = 'Transferencia';
+    const { sourceAccountId, targetAccountId, amount, description } = dto;
+
+    try {
+      this.logger.logOperation(operation, dto);
+
+      if (sourceAccountId === targetAccountId) {
+        throw new BadRequestException('Cannot transfer to the same account');
+      }
+
+      // Validaciones
+      const sourceAccount = await this.prisma.account.findUnique({
+        where: { id: sourceAccountId },
+      });
+      const targetAccount = await this.prisma.account.findUnique({
+        where: { id: targetAccountId },
+      });
+
+      if (!sourceAccount || !targetAccount)
+        throw new NotFoundException('Accounts not found');
+      if (sourceAccount.userId !== userId)
+        throw new ForbiddenException('Not owner of source account');
+
+      // Validar Moneda (Opcional, pero recomendado)
+      if (sourceAccount.currency !== targetAccount.currency) {
+        throw new BadRequestException('Currency mismatch');
+      }
+
+      if (Number(sourceAccount.balance) < amount) {
+        throw new BadRequestException('Insufficient funds');
+      }
+
+      // 🔥 Transacción Atómica
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. Restar Origen
+        const updatedSource = await tx.account.update({
+          where: { id: sourceAccountId },
+          data: { balance: { decrement: amount } },
+        });
+
+        // 2. Transaction Salida
+        await tx.transaction.create({
+          data: {
+            amount: amount,
+            description: `Transferencia a: ${targetAccount.name}`,
+            date: new Date(),
+            type: TransactionType.TRANSFER_OUT,
+            userId,
+            accountId: sourceAccountId, // 👈 CAMBIO: accountId
+            currency: sourceAccount.currency,
+          },
+        });
+
+        // 3. Sumar Destino
+        const updatedTarget = await tx.account.update({
+          where: { id: targetAccountId },
+          data: { balance: { increment: amount } },
+        });
+
+        // 4. Transaction Entrada
+        await tx.transaction.create({
+          data: {
+            amount: amount,
+            description: description
+              ? `Recibido: ${description}`
+              : `Desde: ${sourceAccount.name}`,
+            date: new Date(),
+            type: TransactionType.TRANSFER_IN,
+            userId,
+            accountId: targetAccountId, // 👈 CAMBIO: accountId
+            currency: targetAccount.currency,
+          },
+        });
+
+        return { source: updatedSource, target: updatedTarget };
+      });
+
+      this.logger.logSuccess(operation, { amount });
+      return result;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  async remove(userId: string, id: string) {
+    // Ojo: cambié el orden de los params para ser consistente si quieres
+    const account = await this.prisma.account.findUnique({
+      where: { id, userId },
+    });
+
+    if (!account) throw new NotFoundException('Account not found');
+
+    if (account.isDefault) {
+      throw new BadRequestException('Cannot delete default account');
+    }
+
+    return this.prisma.account.delete({
+      where: { id },
+    });
+  }
+
+  async update(userId: string, id: string, dto: UpdateAccountDto) {
+    const account = await this.prisma.account.findFirst({
+      where: { id, userId },
+    });
+
+    if (!account) throw new NotFoundException('Account not found');
+
+    return this.prisma.account.update({
+      where: { id },
+      data: dto,
+    });
+  }
+}
+
+
+--- FIN ARCHIVO: src\account\accounts.service.ts ---
+
+
+--- INICIO ARCHIVO: src\account\dto\create-account.dto.ts ---
+
+import {
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsHexColor,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsDateString,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+// 👇 IMPORTANTE: Importamos el Enum de Prisma
+import { AccountType } from '@prisma/client';
+
+export class CreateAccountDto {
+  @ApiProperty({
+    description: 'Nombre de la cuenta',
+    example: 'Billetera Principal',
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  // 👇 NUEVO CAMPO CRÍTICO
+  @ApiProperty({
+    description: 'Tipo de cuenta',
+    enum: AccountType,
+    example: AccountType.WALLET,
+  })
+  @IsEnum(AccountType, {
+    message: 'Type must be WALLET, SAVINGS, INVESTMENT or CREDIT_CARD',
+  })
+  type: AccountType;
+
+  @ApiProperty({
+    description: 'Moneda de la cuenta',
+    example: 'ARS',
+    enum: ['ARS', 'USD', 'EUR'],
+  })
+  @IsString()
+  @IsEnum(['ARS', 'USD', 'EUR'])
+  currency: string;
+
+  @ApiPropertyOptional({
+    description: 'Color identificador (Hex)',
+    example: '#10B981',
+  })
+  @IsOptional()
+  @IsHexColor()
+  color?: string;
+
+  @ApiPropertyOptional({
+    description: 'Icono identificador',
+    default: 'wallet',
+  })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  // 👇 Estos ahora son opcionales y semánticamente ligados a SAVINGS
+  @ApiPropertyOptional({ description: 'Monto objetivo (Solo para Metas)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  targetAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Fecha límite (Solo para Metas)' })
+  @IsOptional()
+  @IsDateString()
+  targetDate?: string;
+}
+
+
+--- FIN ARCHIVO: src\account\dto\create-account.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\account\dto\deposit.dto.ts ---
+
+import { IsNumber, IsPositive, IsString, IsOptional } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class DepositDto {
+  @ApiProperty({
+    description: 'Monto a depositar',
+    example: 1000,
+    minimum: 0.01,
+  })
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty({ example: 'Ahorro mensual', required: false })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
+
+--- FIN ARCHIVO: src\account\dto\deposit.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\account\dto\transfer.dto.ts ---
+
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsPositive,
+  IsUUID,
+  IsString,
+  IsOptional,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class TransferDto {
+  @ApiProperty({
+    description: 'ID de la cuenta origen',
+    example: 'uuid-origen',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  sourceAccountId: string;
+
+  @ApiProperty({
+    description: 'ID de la cuenta destino',
+    example: 'uuid-destino',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  targetAccountId: string;
+
+  @ApiProperty({
+    description: 'Monto a transferir',
+    example: 500.0,
+    minimum: 0.01,
+  })
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty({
+    description: 'Nota de la transferencia',
+    example: 'Pago de cena',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
+
+--- FIN ARCHIVO: src\account\dto\transfer.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\account\dto\update-account.dto.ts ---
+
+import { PartialType } from '@nestjs/swagger';
+import { CreateAccountDto } from './create-account.dto';
+
+export class UpdateAccountDto extends PartialType(CreateAccountDto) {}
+
+
+--- FIN ARCHIVO: src\account\dto\update-account.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\account\entities\saving.entity.ts ---
+
+export class Saving {}
+
+
+--- FIN ARCHIVO: src\account\entities\saving.entity.ts ---
+
+
+--- INICIO ARCHIVO: src\account\savings.controller.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { SavingsController } from './accounts.controller';
+import { SavingsService } from './accounts.service';
+
+describe('SavingsController', () => {
+  let controller: SavingsController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [SavingsController],
+      providers: [SavingsService],
+    }).compile();
+
+    controller = module.get<SavingsController>(SavingsController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\account\savings.controller.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\account\savings.service.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { SavingsService } from './accounts.service';
+
+describe('SavingsService', () => {
+  let service: SavingsService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [SavingsService],
+    }).compile();
+
+    service = module.get<SavingsService>(SavingsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\account\savings.service.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\app.controller.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+describe('AppController', () => {
+  let appController: AppController;
+
+  beforeEach(async () => {
+    const app: TestingModule = await Test.createTestingModule({
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
+
+    appController = app.get<AppController>(AppController);
+  });
+
+  describe('root', () => {
+    it('should return "Hello World!"', () => {
+      expect(appController.getHello()).toBe('Hello World!');
+    });
+  });
+});
+
+
+--- FIN ARCHIVO: src\app.controller.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\app.controller.ts ---
+
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+
+  // 👇 Nueva ruta
+  @Get('users')
+  async getUsers() {
+    return this.appService.getUsers();
+  }
+}
+
+
+--- FIN ARCHIVO: src\app.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\app.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { TransactionsModule } from './transactions/transactions.module';
+import { CategoriesModule } from './categories/categories.module';
+import { AccountsModule } from './account/accounts.module';
+import { BudgetsModule } from './budgets/budgets.module';
+import { ReportsModule } from './reports/reports.module';
+import { UsersModule } from './user/users.module';
+
+@Module({
+  imports: [
+    PrismaModule,
+    AuthModule,
+    TransactionsModule,
+    CategoriesModule,
+    AccountsModule,
+    BudgetsModule,
+    ReportsModule,
+    UsersModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+
+
+--- FIN ARCHIVO: src\app.module.ts ---
+
+
+--- INICIO ARCHIVO: src\app.service.ts ---
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service'; // 👈 Importar
+
+@Injectable()
+export class AppService {
+  constructor(private prisma: PrismaService) {} // 👈 Inyección de dependencias
+
+  getHello(): string {
+    return 'Hello World!';
+  }
+
+  // 👇 Nuevo método
+  async getUsers() {
+    return this.prisma.user.findMany();
+  }
+}
+
+
+--- FIN ARCHIVO: src\app.service.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\auth.controller.ts ---
+
+import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
+import type { UserPayload } from './interfaces/user-payload.interface';
+@Controller('auth')
+export class AuthController {
+  constructor(private authService: AuthService) {}
+
+  @Post('register')
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @Post('login')
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
+  }
+
+  // 👇 Nueva ruta protegida
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  getProfile(@CurrentUser() user: UserPayload) {
+    return {
+      message: 'This is your profile',
+      user,
+    };
+  }
+}
+
+
+--- FIN ARCHIVO: src\auth\auth.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\auth.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './strategies/jwt.strategy';
+
+@Module({
+  imports: [
+    PassportModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+      signOptions: {
+        expiresIn: '7d',
+      },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy],
+})
+export class AuthModule {}
+
+
+--- FIN ARCHIVO: src\auth\auth.module.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\auth.service.ts ---
+
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { JwtPayload } from './interfaces/jwt-payload.interface';
+// 👇 Importamos el Enum
+import { AccountType } from '@prisma/client';
+
+// 📋 LISTA DE CATEGORÍAS DEFAULT (KIT DE BIENVENIDA)
+const DEFAULT_CATEGORIES = [
+  // INGRESOS
+  {
+    name: 'Sueldo',
+    type: 'INCOME',
+    icon: 'briefcase',
+    color: '#10B981',
+    isFixed: true,
+  },
+  {
+    name: 'Ahorros',
+    type: 'INCOME',
+    icon: 'briefcase',
+    color: '#10B981',
+    isFixed: true,
+  },
+  // GASTOS
+  {
+    name: 'Café / Restaurante',
+    type: 'EXPENSE',
+    icon: 'cart',
+    color: '#F59E0B',
+    isFixed: false,
+  },
+  {
+    name: 'Transporte',
+    type: 'EXPENSE',
+    icon: 'bus',
+    color: '#3B82F6',
+    isFixed: false,
+  },
+  {
+    name: 'Servicios',
+    type: 'EXPENSE',
+    icon: 'bulb',
+    color: '#EF4444',
+    isFixed: true,
+  },
+  {
+    name: 'Alquiler / Casa',
+    type: 'EXPENSE',
+    icon: 'home',
+    color: '#8B5CF6',
+    isFixed: true,
+  },
+  {
+    name: 'Ocio / Salidas',
+    type: 'EXPENSE',
+    icon: 'party',
+    color: '#EC4899',
+    isFixed: false,
+  },
+  {
+    name: 'Salud',
+    type: 'EXPENSE',
+    icon: 'heart',
+    color: '#EF4444',
+    isFixed: false,
+  },
+  {
+    name: 'Supermercado',
+    type: 'EXPENSE',
+    icon: 'shopping-cart',
+    color: '#10B981',
+    isFixed: false,
+  },
+];
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
+
+  async register(dto: RegisterDto) {
+    const { email, password, name, currency = 'ARS' } = dto;
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('El email ya está registrado');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4. TRANSACCIÓN: Usuario + Cuenta WALLET Default + Categorías
+    const newUser = await this.prisma.$transaction(async (tx) => {
+      // A. Crear Usuario
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          currency,
+          fiscalStartDay: 1,
+        },
+      });
+
+      // B. Crear su Billetera Principal (WALLET)
+      await tx.account.create({
+        // 👈 Usamos tx.account
+        data: {
+          name: 'Efectivo / Billetera',
+          userId: user.id,
+          type: AccountType.WALLET, // 👈 Identidad explícita
+          currency: currency,
+          icon: 'wallet',
+          color: '#10B981',
+          balance: 0,
+          isDefault: true,
+        },
+      });
+
+      // C. Crear Categorías Básicas
+      await tx.category.createMany({
+        data: DEFAULT_CATEGORIES.map((cat) => ({
+          ...cat,
+          userId: user.id,
+        })),
+      });
+      return user;
+    });
+
+    const token = this.generateToken(newUser.id, newUser.email);
+
+    return {
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        currency: newUser.currency,
+      },
+      token,
+    };
+  }
+
+  async login(dto: LoginDto) {
+    // ... (Tu código de login se mantiene igual)
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const token = this.generateToken(user.id, user.email);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      token,
+    };
+  }
+
+  private generateToken(userId: string, email: string): string {
+    const payload: JwtPayload = { sub: userId, email };
+    return this.jwtService.sign(payload);
+  }
+}
+
+
+--- FIN ARCHIVO: src\auth\auth.service.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\decorators\current-user.decorator.ts ---
+
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+
+export const CurrentUser = createParamDecorator(
+  (data: string | undefined, ctx: ExecutionContext) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const request = ctx.switchToHttp().getRequest();
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    const user = request.user;
+
+    // Si no hay usuario (error de auth), retornar undefined
+    if (!user) {
+      return undefined;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+    return data ? user[data] : user;
+  },
+);
+
+
+--- FIN ARCHIVO: src\auth\decorators\current-user.decorator.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\dto\login.dto.ts ---
+
+import { IsEmail, IsString } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export class LoginDto {
+  @ApiProperty({
+    description: 'Email del usuario',
+    example: 'user@example.com',
+  })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({
+    description: 'Contraseña del usuario',
+    example: 'password123',
+  })
+  @IsString()
+  password: string;
+}
+
+
+--- FIN ARCHIVO: src\auth\dto\login.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\dto\register.dto.ts ---
+
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  IsOptional,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class RegisterDto {
+  @ApiProperty({
+    description: 'Email del usuario',
+    example: 'any@example.com',
+  })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({
+    description: 'Contraseña del usuario',
+    example: 'password123',
+  })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(100)
+  password: string;
+  @ApiProperty({
+    description: 'Nombre del usuario',
+    example: 'Juan Perez',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  name: string;
+
+  @ApiPropertyOptional({
+    description: 'Moneda preferida',
+    default: 'ARS',
+    example: 'USD',
+  })
+  @IsOptional()
+  @IsString()
+  currency?: string;
+}
+
+
+--- FIN ARCHIVO: src\auth\dto\register.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\guards\jwt-auth.guard.ts ---
+
+import { Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {}
+
+
+--- FIN ARCHIVO: src\auth\guards\jwt-auth.guard.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\interfaces\jwt-payload.interface.ts ---
+
+export interface JwtPayload {
+  sub: string; // User ID
+  email: string;
+}
+
+
+--- FIN ARCHIVO: src\auth\interfaces\jwt-payload.interface.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\interfaces\user-payload.interface.ts ---
+
+export interface UserPayload {
+  id: string;
+  email: string;
+  name: string;
+}
+
+
+--- FIN ARCHIVO: src\auth\interfaces\user-payload.interface.ts ---
+
+
+--- INICIO ARCHIVO: src\auth\strategies\jwt.strategy.ts ---
+
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { JwtPayload } from '../interfaces/jwt-payload.interface'; // 👈 Importar la interfaz
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor(private prisma: PrismaService) {
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ignoreExpiration: false,
+      secretOrKey: process.env.JWT_SECRET || 'default_secret_key',
+    });
+  }
+
+  async validate(payload: JwtPayload) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+    };
+  }
+}
+
+
+--- FIN ARCHIVO: src\auth\strategies\jwt.strategy.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\budgets.controller.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { BudgetsController } from './budgets.controller';
+import { BudgetsService } from './budgets.service';
+
+describe('BudgetsController', () => {
+  let controller: BudgetsController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [BudgetsController],
+      providers: [BudgetsService],
+    }).compile();
+
+    controller = module.get<BudgetsController>(BudgetsController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\budgets\budgets.controller.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\budgets.controller.ts ---
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  Request,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { BudgetsService } from './budgets.service';
+import { CreateBudgetDto } from './dto/create-budget.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { UpdateBudgetDto } from './dto/update-budget.dto';
+
+@ApiTags('Budgets')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard) // 🔒 Seguridad primero
+@Controller('budgets')
+export class BudgetsController {
+  constructor(private readonly budgetsService: BudgetsService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo presupuesto mensual' })
+  create(
+    @Body() createBudgetDto: CreateBudgetDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.budgetsService.create(createBudgetDto, userId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Ver reporte de presupuestos (Progreso vs Límite)' })
+  findAll(
+    // 1. MANTENEMOS tu decorador para sacar el ID del usuario seguro
+    @CurrentUser('id') userId: string,
+
+    // 2. AGREGAMOS los Query params para el filtro (vienen como string desde la URL)
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    // 3. Convertimos a número antes de pasar al servicio (si vienen definidos)
+    const monthNum = month ? Number(month) : undefined;
+    const yearNum = year ? Number(year) : undefined;
+
+    // 4. Llamamos al servicio con los 3 datos
+    return this.budgetsService.findAll(userId, monthNum, yearNum);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Modificar un presupuesto existente' })
+  update(
+    @Param('id') id: string,
+    @Body() updateBudgetDto: UpdateBudgetDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.budgetsService.update(id, updateBudgetDto, userId);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar un presupuesto' })
+  remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.budgetsService.remove(id, userId);
+  }
+}
+
+
+--- FIN ARCHIVO: src\budgets\budgets.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\budgets.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { BudgetsService } from './budgets.service';
+import { BudgetsController } from './budgets.controller';
+
+@Module({
+  controllers: [BudgetsController],
+  providers: [BudgetsService],
+})
+export class BudgetsModule {}
+
+
+--- FIN ARCHIVO: src\budgets\budgets.module.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\budgets.service.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { BudgetsService } from './budgets.service';
+
+describe('BudgetsService', () => {
+  let service: BudgetsService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [BudgetsService],
+    }).compile();
+
+    service = module.get<BudgetsService>(BudgetsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\budgets\budgets.service.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\budgets.service.ts ---
+
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateBudgetDto } from './dto/create-budget.dto';
+import { AppLogger } from '../common/utils/logger.util';
+//import { TransactionType } from '../transactions/dto/create-transaction.dto';
+import { UpdateBudgetDto } from './dto/update-budget.dto';
+import { Prisma } from '@prisma/client';
+
+@Injectable()
+export class BudgetsService {
+  private readonly logger = new AppLogger(BudgetsService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(createBudgetDto: CreateBudgetDto, userId: string) {
+    const operation = 'Crear Presupuesto';
+    const { categoryId, month, year, amount } = createBudgetDto;
+
+    try {
+      this.logger.logOperation(operation, { userId, month, year, categoryId });
+
+      const budget = await this.prisma.budget.create({
+        data: {
+          amount,
+          month,
+          year,
+          categoryId,
+          userId,
+        },
+      });
+
+      this.logger.logSuccess(operation, { id: budget.id });
+      return budget;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+
+      if ((error as Prisma.PrismaClientKnownRequestError).code === 'P2002') {
+        throw new ConflictException(
+          'Ya existe un presupuesto para esta categoría en ese mes y año.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async findAll(userId: string, month?: number, year?: number) {
+    const operation = 'Obtener Reporte de Presupuestos';
+
+    try {
+      this.logger.logOperation(operation, { userId, month, year });
+
+      // 1. Filtro dinámico limpio (usando tipos de Prisma)
+      const whereInput: Prisma.BudgetWhereInput = {
+        userId,
+        ...(month && { month }),
+        ...(year && { year }),
+      };
+
+      // A. Traemos los presupuestos
+      const budgets = await this.prisma.budget.findMany({
+        where: whereInput,
+        include: { category: true },
+        orderBy: { year: 'desc' },
+      });
+
+      // B. Calculamos el "Gastado Real" cruzando con Transacciones
+      const report = await Promise.all(
+        budgets.map(async (budget) => {
+          // --- CORRECCIÓN DE FECHAS (Cobertura total del mes) ---
+          // Desde: Día 1 del mes a las 00:00:00
+          const startDate = new Date(budget.year, budget.month - 1, 1);
+
+          // Hasta: Día 1 del MES SIGUIENTE a las 00:00:00
+          // Usaremos "menor estricto" (<) para incluir hasta el último milisegundo del mes actual
+          const nextMonthDate = new Date(budget.year, budget.month, 1);
+
+          // C. Consulta de Agregación (SUM)
+          const aggregate = await this.prisma.transaction.aggregate({
+            _sum: {
+              amount: true,
+            },
+            where: {
+              userId,
+              categoryId: budget.categoryId,
+
+              // --- CORRECCIÓN CRÍTICA ---
+              // Usamos 'expense' en minúscula tal como confirmaste que está en tu DB
+              type: 'expense',
+
+              date: {
+                gte: startDate, // Mayor o igual al inicio
+                lt: nextMonthDate, // Menor estricto al inicio del siguiente mes
+              },
+            },
+          });
+
+          // D. Matemáticas Simples
+          const spent = Number(aggregate._sum.amount || 0);
+          const limit = Number(budget.amount); // Tu DB usa 'amount'
+          const remaining = limit - spent;
+          const percentage = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+
+          // E. Retorno con nombres que espera el Frontend
+          return {
+            id: budget.id,
+            categoryId: budget.categoryId,
+            categoryName: budget.category.name,
+            month: budget.month,
+            year: budget.year,
+            amount: limit, // Frontend espera 'amount' (o 'limit', según tu interfaz, ajústalo si es necesario)
+            spent: spent,
+            remaining,
+            percentage,
+            status: percentage > 100 ? 'EXCEEDED' : 'OK',
+          };
+        }),
+      );
+
+      this.logger.logSuccess(operation, { count: report.length });
+      return report;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+
+  private async findOneAndValidateOwner(id: string, userId: string) {
+    const budget = await this.prisma.budget.findUnique({ where: { id } });
+
+    if (!budget) throw new NotFoundException('Budget not found');
+    if (budget.userId !== userId)
+      throw new ForbiddenException('You do not own this budget');
+
+    return budget;
+  }
+
+  async update(id: string, updateBudgetDto: UpdateBudgetDto, userId: string) {
+    const operation = 'Actualizar Presupuesto';
+
+    try {
+      this.logger.logOperation(operation, { id, ...updateBudgetDto });
+
+      // Validamos que sea suyo antes de tocar nada
+      await this.findOneAndValidateOwner(id, userId);
+
+      const updatedBudget = await this.prisma.budget.update({
+        where: { id },
+        data: updateBudgetDto,
+      });
+
+      this.logger.logSuccess(operation, { id: updatedBudget.id });
+      return updatedBudget;
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error); // 👈 Fix del log
+
+      if ((error as Prisma.PrismaClientKnownRequestError).code === 'P2002') {
+        // 👈 Fix del .code
+        throw new ConflictException(
+          'Ya existe otro presupuesto con esa configuración.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  // 3. Eliminar Presupuesto
+  async remove(id: string, userId: string) {
+    const operation = 'Eliminar Presupuesto';
+
+    try {
+      this.logger.logOperation(operation, { id, userId });
+
+      // Validamos propiedad
+      await this.findOneAndValidateOwner(id, userId);
+
+      await this.prisma.budget.delete({
+        where: { id },
+      });
+
+      this.logger.logSuccess(operation, { id });
+      return { message: 'Budget deleted successfully' };
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+}
+
+
+--- FIN ARCHIVO: src\budgets\budgets.service.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\dto\create-budget.dto.ts ---
+
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsPositive,
+  IsInt,
+  Min,
+  Max,
+  IsUUID,
+} from 'class-validator';
+
+export class CreateBudgetDto {
+  @ApiProperty({ description: 'Monto límite a gastar', example: 50000.0 })
+  @IsNumber()
+  @IsPositive()
+  amount: number;
+
+  @ApiProperty({ description: 'Mes del presupuesto (1-12)', example: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month: number;
+
+  @ApiProperty({ description: 'Año del presupuesto', example: 2026 })
+  @IsInt()
+  @Min(2024)
+  year: number;
+
+  @ApiProperty({
+    description: 'ID de la categoría a controlar',
+    example: 'uuid-de-categoria',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  categoryId: string;
+}
+
+
+--- FIN ARCHIVO: src\budgets\dto\create-budget.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\dto\update-budget.dto.ts ---
+
+import { PartialType } from '@nestjs/swagger';
+import { CreateBudgetDto } from './create-budget.dto';
+
+export class UpdateBudgetDto extends PartialType(CreateBudgetDto) {}
+
+
+--- FIN ARCHIVO: src\budgets\dto\update-budget.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\budgets\entities\budget.entity.ts ---
+
+export class Budget {}
+
+
+--- FIN ARCHIVO: src\budgets\entities\budget.entity.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\categories.controller.ts ---
+
+// src/categories/categories.controller.ts
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { CategoriesService } from './categories.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { QueryCategoryDto } from './dto/query-category.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { PaginatedResult } from '../common/dto/pagination.dto';
+import { Category } from '@prisma/client';
+
+@Controller('categories')
+@UseGuards(JwtAuthGuard)
+export class CategoriesController {
+  constructor(private readonly categoriesService: CategoriesService) {}
+
+  /**
+   * Crea las categorías por defecto para el usuario
+   * @returns Mensaje y array de categorías creadas
+   */
+  @Post('seed')
+  async seed(@CurrentUser('id') userId: string) {
+    return this.categoriesService.seed(userId);
+  }
+
+  /**
+   * Crea una nueva categoría personalizada
+   * @param createCategoryDto - Datos de la categoría
+   * @param userId - ID del usuario autenticado
+   * @returns Categoría creada
+   */
+  @Post()
+  async create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.categoriesService.create(createCategoryDto, userId);
+  }
+
+  /**
+   * Lista todas las categorías del usuario con filtros opcionales
+   * @param query - Filtros de búsqueda (type)
+   * @param userId - ID del usuario autenticado
+   * @returns Array de categorías
+   */
+  @Get()
+  async findAll(
+    @Query() query: QueryCategoryDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<PaginatedResult<Category>> {
+    return this.categoriesService.findAll(query, userId);
+  }
+
+  /**
+   * Obtiene una categoría específica por ID
+   * @param id - ID de la categoría
+   * @param userId - ID del usuario autenticado
+   * @returns Categoría encontrada
+   */
+  @Get(':id')
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.categoriesService.findOne(id, userId);
+  }
+
+  /**
+   * Actualiza una categoría existente
+   * @param id - ID de la categoría
+   * @param updateCategoryDto - Datos a actualizar
+   * @param userId - ID del usuario autenticado
+   * @returns Categoría actualizada
+   */
+  @Patch(':id')
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateCategoryDto: UpdateCategoryDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.categoriesService.update(id, updateCategoryDto, userId);
+  }
+
+  /**
+   * Elimina una categoría (soft delete)
+   * @param id - ID de la categoría
+   * @param userId - ID del usuario autenticado
+   * @returns Mensaje de confirmación
+   */
+  @Delete(':id')
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.categoriesService.remove(id, userId);
+  }
+}
+
+
+--- FIN ARCHIVO: src\categories\categories.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\categories.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { CategoriesController } from './categories.controller';
+import { CategoriesService } from './categories.service';
+
+@Module({
+  controllers: [CategoriesController],
+  providers: [CategoriesService],
+  exports: [CategoriesService], // Exportar para usarlo en AuthModule
+})
+export class CategoriesModule {}
+
+
+--- FIN ARCHIVO: src\categories\categories.module.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\categories.service.ts ---
+
+// src/categories/categories.service.ts
+
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Category } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { QueryCategoryDto } from './dto/query-category.dto';
+import { AppLogger } from '../common/utils/logger.util';
+import {
+  PaginatedResult,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
+
+@Injectable()
+export class CategoriesService {
+  private readonly logger = new AppLogger(CategoriesService.name);
+
+  constructor(private prisma: PrismaService) {}
+
+  async seed(userId: string) {
+    this.logger.log(`Seeding default categories for user: ${userId}`);
+
+    const existingCategories = await this.prisma.category.findMany({
+      where: { userId, deletedAt: null },
+    });
+
+    if (existingCategories.length > 0) {
+      this.logger.log(
+        `User ${userId} already has ${existingCategories.length} categories`,
+      );
+      return {
+        message: 'Categories already exist',
+        categories: existingCategories,
+      };
+    }
+
+    const defaultCategories = [
+      // GASTOS
+      {
+        name: 'Supermercado',
+        type: 'expense' as const,
+        color: '#FF6B6B',
+        icon: 'shopping-cart',
+      },
+      {
+        name: 'Transporte',
+        type: 'expense' as const,
+        color: '#4ECDC4',
+        icon: 'car',
+      },
+      {
+        name: 'Salud',
+        type: 'expense' as const,
+        color: '#95E1D3',
+        icon: 'heart',
+      },
+      {
+        name: 'Entretenimiento',
+        type: 'expense' as const,
+        color: '#F38181',
+        icon: 'film',
+      },
+      {
+        name: 'Servicios',
+        type: 'expense' as const,
+        color: '#AA96DA',
+        icon: 'zap',
+      },
+      {
+        name: 'Restaurantes',
+        type: 'expense' as const,
+        color: '#FCBAD3',
+        icon: 'coffee',
+      },
+      {
+        name: 'Educación',
+        type: 'expense' as const,
+        color: '#A8D8EA',
+        icon: 'book',
+      },
+      {
+        name: 'Ropa',
+        type: 'expense' as const,
+        color: '#FFD93D',
+        icon: 'shopping-bag',
+      },
+
+      // INGRESOS
+      {
+        name: 'Salario',
+        type: 'income' as const,
+        color: '#6BCF7F',
+        icon: 'briefcase',
+      },
+      {
+        name: 'Freelance',
+        type: 'income' as const,
+        color: '#4D96FF',
+        icon: 'code',
+      },
+      {
+        name: 'Inversiones',
+        type: 'income' as const,
+        color: '#FFB830',
+        icon: 'trending-up',
+      },
+      {
+        name: 'Bonos',
+        type: 'income' as const,
+        color: '#C780FA',
+        icon: 'gift',
+      },
+
+      // AMBOS
+      {
+        name: 'Otros',
+        type: 'both' as const,
+        color: '#95A5A6',
+        icon: 'more-horizontal',
+      },
+    ];
+
+    try {
+      const createdCategories = await Promise.all(
+        defaultCategories.map((category) =>
+          this.prisma.category.create({
+            data: {
+              ...category,
+              userId,
+            },
+          }),
+        ),
+      );
+
+      this.logger.logSuccess('Seed categories', {
+        userId,
+        count: createdCategories.length,
+      });
+
+      return {
+        message: 'Default categories created successfully',
+        categories: createdCategories,
+      };
+    } catch (error) {
+      this.logger.logFailure('Seed categories', error as Error);
+      throw error;
+    }
+  }
+
+  async create(dto: CreateCategoryDto, userId: string) {
+    this.logger.logOperation('Create category', {
+      name: dto.name,
+      type: dto.type,
+      userId,
+    });
+
+    const existing = await this.prisma.category.findFirst({
+      where: {
+        name: dto.name,
+        type: dto.type,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (existing) {
+      this.logger.warn(
+        `Duplicate category attempt: ${dto.name} (${dto.type}) by user ${userId}`,
+      );
+      throw new ConflictException(
+        `Category "${dto.name}" with type "${dto.type}" already exists`,
+      );
+    }
+
+    try {
+      const category = await this.prisma.category.create({
+        data: {
+          ...dto,
+          userId,
+        },
+      });
+
+      this.logger.logSuccess('Create category', {
+        id: category.id,
+        name: category.name,
+      });
+      return category;
+    } catch (error) {
+      this.logger.logFailure('Create category', error as Error);
+      throw error;
+    }
+  }
+
+  async findAll(
+    query: QueryCategoryDto,
+    userId: string,
+  ): Promise<PaginatedResult<Category>> {
+    this.logger.log(
+      `Finding categories for user ${userId} with filters: ${JSON.stringify(query)}`,
+    );
+
+    const { page = 1, limit = 20, type } = query;
+
+    const where: Prisma.CategoryWhereInput = {
+      userId,
+      deletedAt: null,
+    };
+
+    if (type && (type as string) === 'both') {
+      where.OR = [
+        { type: 'INCOME' }, // Asegúrate que estos strings coincidan con tu Enum de Prisma
+        { type: 'EXPENSE' },
+        { type: 'BOTH' },
+      ];
+    } else if (type) {
+      where.type = type; // Cast seguro si vienes de un string query param
+    }
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.category.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.category.count({ where }),
+    ]);
+
+    this.logger.log(
+      `Found ${data.length} of ${total} categories for user ${userId}`,
+    );
+
+    return createPaginatedResponse(data, total, page, limit);
+  }
+
+  async findOne(id: string, userId: string) {
+    this.logger.log(`Finding category ${id} for user ${userId}`);
+
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!category) {
+      this.logger.warn(`Category ${id} not found for user ${userId}`);
+      throw new NotFoundException('Category not found');
+    }
+
+    return category;
+  }
+
+  async update(id: string, dto: UpdateCategoryDto, userId: string) {
+    this.logger.logOperation('Update category', { id, updates: dto, userId });
+
+    await this.findOne(id, userId);
+
+    if (dto.name) {
+      const existing = await this.prisma.category.findFirst({
+        where: {
+          name: dto.name,
+          userId,
+          deletedAt: null,
+          NOT: { id },
+        },
+      });
+
+      if (existing) {
+        this.logger.warn(
+          `Duplicate category name in update: ${dto.name} by user ${userId}`,
+        );
+        throw new ConflictException(`Category "${dto.name}" already exists`);
+      }
+    }
+
+    try {
+      const category = await this.prisma.category.update({
+        where: { id },
+        data: dto,
+      });
+
+      this.logger.logSuccess('Update category', { id, name: category.name });
+      return category;
+    } catch (error) {
+      this.logger.logFailure('Update category', error as Error);
+      throw error;
+    }
+  }
+
+  async remove(id: string, userId: string) {
+    this.logger.logOperation('Delete category', { id, userId });
+
+    await this.findOne(id, userId);
+
+    try {
+      await this.prisma.category.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      this.logger.logSuccess('Delete category', { id });
+      return { message: 'Category deleted successfully' };
+    } catch (error) {
+      this.logger.logFailure('Delete category', error as Error);
+      throw error;
+    }
+  }
+}
+
+
+--- FIN ARCHIVO: src\categories\categories.service.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\dto\create-category.dto.ts ---
+
+import {
+  IsString,
+  IsEnum,
+  IsBoolean,
+  IsOptional,
+  MinLength,
+  MaxLength,
+  Matches,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum CategoryType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+  BOTH = 'both',
+}
+
+export class CreateCategoryDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(50)
+  name: string;
+
+  @IsEnum(CategoryType, { message: 'Type must be income, expense, or both' })
+  type: CategoryType;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^#[0-9A-Fa-f]{6}$/, {
+    message: 'Color must be a valid hex code (e.g., #FF5733)',
+  })
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  icon?: string;
+
+  @ApiProperty({
+    description: '¿Es un gasto fijo mensual? (true: Alquiler, false: Cine)',
+    example: true,
+    default: false,
+  })
+  @IsOptional() // Opcional porque tiene default en BD
+  @IsBoolean()
+  isFixed?: boolean;
+}
+
+
+--- FIN ARCHIVO: src\categories\dto\create-category.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\dto\query-category.dto.ts ---
+
+import { IsOptional, IsEnum } from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+
+export enum CategoryType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+  BOTH = 'both',
+}
+
+export class QueryCategoryDto extends PaginationDto {
+  @IsOptional()
+  @IsEnum(CategoryType)
+  type?: CategoryType;
+}
+
+
+--- FIN ARCHIVO: src\categories\dto\query-category.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\categories\dto\update-category.dto.ts ---
+
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateCategoryDto } from './create-category.dto';
+
+export class UpdateCategoryDto extends PartialType(CreateCategoryDto) {}
+
+
+--- FIN ARCHIVO: src\categories\dto\update-category.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\common\dto\pagination.dto.ts ---
+
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, Min, Max } from 'class-validator';
+
+export class PaginationDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 20;
+}
+
+/**
+ * Interfaz para resultados paginados
+ */
+export interface PaginatedResult<T> {
+  data: T[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+/**
+ * Función helper para crear respuestas paginadas
+ */
+export function createPaginatedResponse<T>(
+  data: T[],
+  total: number,
+  page: number,
+  limit: number,
+): PaginatedResult<T> {
+  const totalPages = Math.ceil(total / limit);
+
+  return {
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    },
+  };
+}
+
+
+--- FIN ARCHIVO: src\common\dto\pagination.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\common\filters\all-exceptions.filter.ts ---
+
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+
+@Catch()
+export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    // Determinar status code
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // Determinar mensaje
+    let message = 'Internal server error';
+    if (exception instanceof HttpException) {
+      const exceptionResponse = exception.getResponse();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+      const rawMessage = (exceptionResponse as any).message;
+
+      if (Array.isArray(rawMessage)) {
+        message = rawMessage.join(', '); // "Error 1, Error 2"
+      } else if (typeof rawMessage === 'string') {
+        message = rawMessage;
+      } else {
+        message = exception.message;
+      }
+
+      // Construir respuesta
+      const errorResponse = {
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        method: request.method,
+        message,
+      };
+
+      // Loguear el error con stack trace completo
+      this.logger.error(
+        `Unhandled Exception - ${request.method} ${request.url}`,
+        exception instanceof Error
+          ? exception.stack
+          : JSON.stringify(exception),
+      );
+
+      // En producción, no exponer detalles internos
+      if (process.env.NODE_ENV === 'production' && status === 500) {
+        errorResponse.message = 'An unexpected error occurred';
+      }
+
+      response.status(status).json(errorResponse);
+    }
+  }
+}
+
+
+--- FIN ARCHIVO: src\common\filters\all-exceptions.filter.ts ---
+
+
+--- INICIO ARCHIVO: src\common\filters\http-exception.filter.ts ---
+
+// src/common/filters/http-exception.filter.ts
+
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  Logger,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
+
+/**
+ * Filtro global para manejar todas las excepciones HTTP de NestJS
+ *
+ * Captura errores como:
+ * - BadRequestException (400)
+ * - UnauthorizedException (401)
+ * - NotFoundException (404)
+ * - ConflictException (409)
+ * - etc.
+ *
+ * Retorna un formato JSON consistente y loguea el error
+ */
+@Catch(HttpException)
+export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
+  catch(exception: HttpException, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    const status = exception.getStatus();
+    const exceptionResponse = exception.getResponse();
+
+    // Extraer el mensaje del error
+    let message: string | string[];
+    if (
+      typeof exceptionResponse === 'object' &&
+      exceptionResponse !== null &&
+      'message' in exceptionResponse
+    ) {
+      message = (exceptionResponse as { message: string | string[] }).message;
+    } else if (typeof exceptionResponse === 'string') {
+      message = exceptionResponse;
+    } else {
+      message = exception.message;
+    }
+
+    // Construir la respuesta de error
+    const errorResponse = {
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
+      message,
+    };
+
+    // Loguear el error
+    this.logger.error(
+      `HTTP ${status} Error - ${request.method} ${request.url}`,
+      JSON.stringify({
+        message,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        body: request.body,
+        params: request.params,
+        query: request.query,
+      }),
+    );
+
+    // Enviar respuesta
+    response.status(status).json(errorResponse);
+  }
+}
+
+
+--- FIN ARCHIVO: src\common\filters\http-exception.filter.ts ---
+
+
+--- INICIO ARCHIVO: src\common\filters\prisma-exception.filter.ts ---
+
+// src/common/filters/prisma-exception.filter.ts
+
+import { ArgumentsHost, Catch, HttpStatus, Logger } from '@nestjs/common';
+import { BaseExceptionFilter } from '@nestjs/core';
+import { Prisma } from '@prisma/client';
+import { Request, Response } from 'express';
+
+/**
+ * Filtro para convertir errores de Prisma en respuestas HTTP amigables
+ *
+ * Códigos de error de Prisma más comunes:
+ * - P2002: Unique constraint violation (email duplicado, etc.)
+ * - P2025: Record not found
+ * - P2003: Foreign key constraint failed
+ * - P2001: Record does not exist
+ * - P2014: Invalid ID
+ *
+ * Documentación: https://www.prisma.io/docs/reference/api-reference/error-reference
+ */
+@Catch(Prisma.PrismaClientKnownRequestError)
+export class PrismaExceptionFilter extends BaseExceptionFilter {
+  private readonly logger = new Logger(PrismaExceptionFilter.name);
+
+  catch(exception: Prisma.PrismaClientKnownRequestError, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    let status = HttpStatus.INTERNAL_SERVER_ERROR;
+    let message = 'Internal server error';
+
+    // Mapear códigos de error de Prisma a códigos HTTP
+    switch (exception.code) {
+      case 'P2002': {
+        // Unique constraint violation
+        status = HttpStatus.CONFLICT;
+        const targets = exception.meta?.target as string[] | undefined;
+        message = targets
+          ? `A record with this ${targets.join(', ')} already exists`
+          : 'This record already exists';
+        break;
+      }
+
+      case 'P2025': {
+        // Record not found
+        status = HttpStatus.NOT_FOUND;
+        message = 'Record not found';
+        break;
+      }
+
+      case 'P2003': {
+        // Foreign key constraint failed
+        status = HttpStatus.BAD_REQUEST;
+        const fieldName = exception.meta?.field_name as string | undefined;
+        message = fieldName
+          ? `Invalid reference: ${fieldName} does not exist`
+          : 'Invalid reference to related record';
+        break;
+      }
+
+      case 'P2001': {
+        // Record does not exist
+        status = HttpStatus.NOT_FOUND;
+        message = 'The requested record does not exist';
+        break;
+      }
+
+      case 'P2014': {
+        // Invalid ID
+        status = HttpStatus.BAD_REQUEST;
+        message = 'Invalid ID provided';
+        break;
+      }
+
+      case 'P2011': {
+        // Null constraint violation
+        status = HttpStatus.BAD_REQUEST;
+        const nullField = exception.meta?.target as string | undefined;
+        message = nullField
+          ? `${nullField} cannot be null`
+          : 'A required field is missing';
+        break;
+      }
+
+      default:
+        // Error desconocido de Prisma
+        message = exception.message;
+        this.logger.error(
+          `Unhandled Prisma Error Code: ${exception.code}`,
+          exception.stack,
+        );
+    }
+
+    // Construir respuesta
+    const errorResponse = {
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      method: request.method,
+      message,
+      error: `Prisma Error: ${exception.code}`,
+    };
+
+    // Loguear el error
+    this.logger.error(
+      `Prisma ${exception.code} - ${request.method} ${request.url}`,
+      JSON.stringify({
+        message,
+        meta: exception.meta,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        body: request.body,
+      }),
+    );
+
+    response.status(status).json(errorResponse);
+  }
+}
+
+
+--- FIN ARCHIVO: src\common\filters\prisma-exception.filter.ts ---
+
+
+--- INICIO ARCHIVO: src\common\utils\logger.util.ts ---
+
+import { Logger } from '@nestjs/common';
+
+export class AppLogger extends Logger {
+  /**
+   * Log de nivel ERROR - Para errores que requieren atención
+   */
+  error(message: string, trace?: string, context?: string) {
+    super.error(message, trace, context || this.context);
+  }
+
+  /**
+   * Log de nivel WARN - Para situaciones anómalas que no son errores
+   */
+  warn(message: string, context?: string) {
+    super.warn(message, context || this.context);
+  }
+
+  /**
+   * Log de nivel LOG - Para operaciones importantes
+   */
+  log(message: string, context?: string) {
+    super.log(message, context || this.context);
+  }
+
+  /**
+   * Log de nivel DEBUG - Para debugging detallado
+   */
+  debug(message: string, context?: string) {
+    super.debug(message, context || this.context);
+  }
+
+  /**
+   * Log de nivel VERBOSE - Para información muy detallada
+   */
+  verbose(message: string, context?: string) {
+    super.verbose(message, context || this.context);
+  }
+
+  /**
+   * Log de inicio de operación con datos
+   */
+  logOperation(operation: string, data?: any) {
+    const message = data
+      ? `${operation} - Data: ${JSON.stringify(data)}`
+      : operation;
+    this.log(message);
+  }
+
+  /**
+   * Log de operación exitosa
+   */
+  logSuccess(operation: string, result?: any) {
+    const message = result
+      ? `✓ ${operation} - Success: ${JSON.stringify(result)}`
+      : `✓ ${operation} - Success`;
+    this.log(message);
+  }
+
+  /**
+   * Log de operación fallida
+   */
+  logFailure(operation: string, error: Error) {
+    this.error(`✗ ${operation} - Failed: ${error.message}`, error.stack);
+  }
+}
+
+
+--- FIN ARCHIVO: src\common\utils\logger.util.ts ---
+
+
+--- INICIO ARCHIVO: src\main.ts ---
+
+// apps/backend/src/main.ts
+
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.setGlobalPrefix('api');
+
+  // Habilitar CORS (si lo necesitás para frontend)
+  app.enableCors();
+
+  // Validación global de DTOs con class-validator
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Remover propiedades no definidas en el DTO
+      forbidNonWhitelisted: true, // Rechazar requests con propiedades extra
+      transform: true, // Transformar payloads a instancias de DTO
+      transformOptions: {
+        enableImplicitConversion: true, // Convertir tipos automáticamente
+      },
+    }),
+  );
+
+  // --- CONFIGURACIÓN SWAGGER INICIO ---
+  const config = new DocumentBuilder()
+    .setTitle('Your Finance App API')
+    .setDescription('Documentación para la API de finanzas personales')
+    .setVersion('1.0')
+    .addBearerAuth() // <--- Habilita el botón para meter el JWT
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document); // La URL será /docs
+  // --- CONFIGURACIÓN SWAGGER FIN ---
+
+  // Exception Filters - ORDEN IMPORTANTE: de más específico a más general
+  // 1. Primero se intenta con HttpExceptionFilter (errores HTTP de NestJS)
+  // 2. Luego con PrismaExceptionFilter (errores de base de datos)
+  // 3. Finalmente con AllExceptionsFilter (cualquier otro error)
+  app.useGlobalFilters(
+    new HttpExceptionFilter(),
+    new PrismaExceptionFilter(),
+    new AllExceptionsFilter(),
+  );
+
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
+  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  console.log(`📚 API endpoints available at: http://localhost:${port}/api`);
+}
+
+void bootstrap();
+
+
+--- FIN ARCHIVO: src\main.ts ---
+
+
+--- INICIO ARCHIVO: src\reports\reports.controller.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { ReportsController } from './reports.controller';
+
+describe('ReportsController', () => {
+  let controller: ReportsController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [ReportsController],
+    }).compile();
+
+    controller = module.get<ReportsController>(ReportsController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\reports\reports.controller.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\reports\reports.controller.ts ---
+
+import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProduces,
+} from '@nestjs/swagger';
+import type { Response } from 'express'; // 👈 Importante: Tipado de Express
+import { ReportsService } from './reports.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+@ApiTags('Reports')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller('reports')
+export class ReportsController {
+  constructor(private readonly reportsService: ReportsService) {}
+
+  @Get('export')
+  @ApiOperation({ summary: 'Descargar reporte de transacciones en Excel' })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ) // 👈 Le avisa a Swagger qué devuelve
+  async exportTransactions(
+    @CurrentUser('id') userId: string,
+    @Res() res: Response, // 👈 Inyectamos la respuesta nativa de Express
+  ) {
+    // 1. Configuramos los Headers para descarga
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="transactions.xlsx"',
+    );
+
+    // 2. Llamamos al servicio pasando el objeto 'res' para que escriba el stream
+    await this.reportsService.getTransactionsReport(userId, res);
+  }
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Obtener datos resumidos para gráficos (Dashboard)',
+  })
+  async getDashboard(@CurrentUser('id') userId: string) {
+    return this.reportsService.getDashboardStats(userId);
+  }
+}
+
+
+--- FIN ARCHIVO: src\reports\reports.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\reports\reports.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { ReportsController } from './reports.controller';
+import { ReportsService } from './reports.service';
+
+@Module({
+  controllers: [ReportsController],
+  providers: [ReportsService],
+})
+export class ReportsModule {}
+
+
+--- FIN ARCHIVO: src\reports\reports.module.ts ---
+
+
+--- INICIO ARCHIVO: src\reports\reports.service.spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { ReportsService } from './reports.service';
+
+describe('ReportsService', () => {
+  let service: ReportsService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [ReportsService],
+    }).compile();
+
+    service = module.get<ReportsService>(ReportsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+
+
+--- FIN ARCHIVO: src\reports\reports.service.spec.ts ---
+
+
+--- INICIO ARCHIVO: src\reports\reports.service.ts ---
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AppLogger } from '../common/utils/logger.util';
+import * as ExcelJS from 'exceljs';
+import { Response } from 'express'; // Necesario para manejar el stream
+import { TransactionType } from '../transactions/dto/create-transaction.dto';
+
+@Injectable()
+export class ReportsService {
+  private readonly logger = new AppLogger(ReportsService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async getTransactionsReport(userId: string, res: Response) {
+    const operation = 'Exportar Reporte Excel';
+    this.logger.logOperation(operation, { userId });
+
+    try {
+      // 1. Crear el Libro y la Hoja
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Mis Transacciones');
+
+      // 2. Definir Columnas
+      worksheet.columns = [
+        { header: 'Fecha', key: 'date', width: 15 },
+        { header: 'Tipo', key: 'type', width: 15 },
+        { header: 'Categoría', key: 'category', width: 20 },
+        { header: 'Descripción', key: 'description', width: 30 },
+        { header: 'Monto', key: 'amount', width: 15 },
+        { header: 'Moneda', key: 'currency', width: 10 },
+      ];
+
+      // 3. Estilo del Encabezado (Negrita)
+      worksheet.getRow(1).font = { bold: true };
+
+      // 4. Buscar Datos (Aquí en el futuro usaremos streaming de DB si son muchos datos)
+      // Por ahora traemos todo, pero solo lo necesario
+      const transactions = await this.prisma.transaction.findMany({
+        where: { userId },
+        include: { category: true },
+        orderBy: { date: 'desc' },
+      });
+
+      // 5. Agregar filas
+      transactions.forEach((t) => {
+        worksheet.addRow({
+          date: t.date,
+          type: t.type,
+          category: t.category?.name || 'Sin Categoría',
+          description: t.description,
+          amount: Number(t.amount), // Convertir Decimal a Number para Excel
+          currency: t.currency,
+        });
+      });
+
+      // 6. Escribir directamente en la respuesta (Stream)
+      // Esto envía el archivo al navegador sin guardarlo en el disco del servidor
+      await workbook.xlsx.write(res);
+
+      this.logger.logSuccess(operation, { count: transactions.length });
+
+      // Importante: No hacemos 'return' porque ya escribimos en 'res'
+      res.end();
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+  async getDashboardStats(userId: string) {
+    const operation = 'Obtener Estadísticas Dashboard';
+
+    try {
+      this.logger.logOperation(operation, { userId });
+
+      // 1. Agrupar Gastos por Categoría (SOLO ACTIVOS)
+      const expensesByCategory = await this.prisma.transaction.groupBy({
+        by: ['categoryId'],
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          deletedAt: null, // 👈 IMPORTANTE: Ignorar los borrados
+        },
+      });
+
+      const categoryIds = expensesByCategory
+        .map((e) => e.categoryId)
+        .filter((id): id is string => id !== null);
+
+      const categories = await this.prisma.category.findMany({
+        where: { id: { in: categoryIds } },
+      });
+
+      const chartData = expensesByCategory.map((item) => {
+        const category = categories.find((c) => c.id === item.categoryId);
+        return {
+          categoryName: category?.name || 'Desconocida',
+          total: Number(item._sum.amount),
+          color: category?.color || '#cccccc',
+        };
+      });
+
+      // 4. Totales Generales (SOLO ACTIVOS)
+      const totals = await this.prisma.transaction.groupBy({
+        by: ['type'],
+        _sum: { amount: true },
+        where: {
+          userId,
+          deletedAt: null, // 👈 IMPORTANTE
+        },
+      });
+
+      const totalWealth = await this.prisma.savingsAccount.aggregate({
+        _sum: { balance: true },
+        where: { userId },
+        // Nota: Las cuentas usualmente no tienen soft-delete, pero si lo tuvieran, agrégalo aquí también.
+      });
+
+      // Análisis de Fijos vs Variables
+      const allCategories = await this.prisma.category.findMany({
+        where: { userId },
+      });
+      const fixedIds = allCategories.filter((c) => c.isFixed).map((c) => c.id);
+
+      // 5. Gastos Fijos (SOLO ACTIVOS)
+      const fixedExpenses = await this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          categoryId: { in: fixedIds },
+          deletedAt: null, // 👈 IMPORTANTE
+        },
+      });
+
+      // 6. Gastos Variables (SOLO ACTIVOS)
+      const variableExpenses = await this.prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: {
+          userId,
+          type: TransactionType.EXPENSE,
+          categoryId: { notIn: fixedIds },
+          deletedAt: null, // 👈 IMPORTANTE
+        },
+      });
+
+      const summary = {
+        income: Number(
+          totals.find((t) => t.type === (TransactionType.INCOME as string))
+            ?._sum.amount || 0,
+        ),
+        expense: Number(
+          totals.find((t) => t.type === (TransactionType.EXPENSE as string))
+            ?._sum.amount || 0,
+        ),
+        cashFlow: 0,
+        totalAvailable: Number(totalWealth._sum.balance || 0),
+      };
+
+      summary.cashFlow = summary.income - summary.expense;
+
+      this.logger.logSuccess(operation, { categoriesCount: chartData.length });
+
+      return {
+        summary,
+        chartData,
+        expensesAnalysis: {
+          fixed: Number(fixedExpenses._sum.amount || 0),
+          variable: Number(variableExpenses._sum.amount || 0),
+        },
+      };
+    } catch (error) {
+      this.logger.logFailure(operation, error as Error);
+      throw error;
+    }
+  }
+}
+
+
+--- FIN ARCHIVO: src\reports\reports.service.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\dto\create-transaction.dto.ts ---
+
+import {
+  IsString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsDateString,
+  Min,
+  MaxLength,
+  IsNotEmpty,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum TransactionType {
+  INCOME = 'income', // Ingresos externos (Sueldo)
+  EXPENSE = 'expense', // Gastos reales (Comida)
+  BOTH = 'both', // (Para filtros)
+  TRANSFER_IN = 'transfer_in', // Recibir dinero de otra cuenta propia
+  TRANSFER_OUT = 'transfer_out', // Enviar dinero a otra cuenta propia
+}
+
+export class CreateTransactionDto {
+  @ApiProperty({
+    description: 'Tipo de movimiento',
+    enum: TransactionType,
+    example: TransactionType.EXPENSE,
+  })
+  @IsEnum(TransactionType, { message: 'Type must be either income or expense' })
+  type: TransactionType;
+
+  @ApiProperty({
+    description: 'Monto del movimiento',
+    minimum: 0.01,
+    example: 1500.75,
+  })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01, { message: 'Amount must be greater than 0' })
+  amount: number;
+
+  @ApiProperty({
+    description: 'Tipo de moneda',
+    example: 'ARS',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(3)
+  currency?: string = 'ARS';
+
+  @ApiProperty({
+    description: 'Descripción del movimiento',
+    example: 'Compra de comestibles',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiProperty({
+    description: 'Fecha del movimiento',
+    example: '2023-10-05T14:48:00.000Z',
+  })
+  @IsDateString()
+  @IsOptional()
+  date?: string;
+
+  @ApiProperty({
+    description: 'ID de la categoría asociada al movimiento',
+    example: '92b77be3-a14a-462c-a291-7eff27cbcf47',
+  })
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+}
+
+
+--- FIN ARCHIVO: src\transactions\dto\create-transaction.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\dto\query-transaction.dto.ts ---
+
+import {
+  IsString,
+  IsEnum,
+  IsDateString,
+  IsUUID,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsNotEmpty,
+} from 'class-validator';
+import { PaginationDto } from '../../common/dto/pagination.dto';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+
+export enum TransactionType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+}
+
+export enum Currency {
+  ARS = 'ARS',
+  USD = 'USD',
+  EUR = 'EUR',
+}
+
+export class QueryTransactionDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Buscar por descripción' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsEnum(TransactionType)
+  type?: TransactionType;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
+  @IsEnum(Currency)
+  currency?: Currency;
+
+  @ApiPropertyOptional({ description: 'Mes para filtrar (1-12)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  month?: number;
+
+  @ApiPropertyOptional({ description: 'Año para filtrar (ej: 2026)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2000)
+  year?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  accountId: string;
+}
+
+
+--- FIN ARCHIVO: src\transactions\dto\query-transaction.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\dto\update-transaction.dto.ts ---
+
+import { PartialType } from '@nestjs/swagger';
+import { CreateTransactionDto } from './create-transaction.dto';
+
+export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {}
+
+
+--- FIN ARCHIVO: src\transactions\dto\update-transaction.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\transactions.controller.ts ---
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { TransactionsService } from './transactions.service';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { QueryTransactionDto } from './dto/query-transaction.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { UserPayload } from '../auth/interfaces/user-payload.interface';
+import { PaginatedResult } from '../common/dto/pagination.dto';
+import { Transaction } from '@prisma/client';
+
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+
+@ApiTags('transactions')
+@ApiBearerAuth()
+@Controller('transactions')
+@UseGuards(JwtAuthGuard)
+export class TransactionsController {
+  constructor(private readonly transactionsService: TransactionsService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new transaction' })
+  @ApiResponse({
+    status: 201,
+    description: 'The transaction has been successfully created.',
+    type: CreateTransactionDto,
+  })
+  create(
+    @CurrentUser() user: UserPayload,
+    @Body() createTransactionDto: CreateTransactionDto,
+  ) {
+    // Este estaba bien: (dto, userId)
+    return this.transactionsService.create(createTransactionDto, user.id);
+  }
+
+  @Get()
+  async findAll(
+    @Query() query: QueryTransactionDto,
+    @CurrentUser('id') userId: string,
+  ): Promise<PaginatedResult<Transaction>> {
+    // Este estaba bien: (query, userId)
+    return this.transactionsService.findAll(query, userId);
+  }
+
+  @Get('balance')
+  getBalance(@CurrentUser() user: UserPayload) {
+    // Este estaba bien: (userId)
+    return this.transactionsService.getBalance(user.id);
+  }
+
+  @Get(':id')
+  findOne(
+    @CurrentUser() user: UserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    // 🔴 CORREGIDO: Antes era (user.id, id) -> Ahora es (id, user.id)
+    return this.transactionsService.findOne(id, user.id);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentUser() user: UserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateTransactionDto: UpdateTransactionDto,
+  ) {
+    // 🔴 CORREGIDO: Antes era (user.id, dto, id) -> Ahora es (id, dto, user.id)
+    return this.transactionsService.update(id, updateTransactionDto, user.id);
+  }
+
+  @Delete(':id')
+  remove(
+    @CurrentUser() user: UserPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    // 🔴 CORREGIDO: Antes era (user.id, id) -> Ahora es (id, user.id)
+    return this.transactionsService.remove(id, user.id);
+  }
+}
+
+
+--- FIN ARCHIVO: src\transactions\transactions.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\transactions.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { TransactionsController } from './transactions.controller';
+import { TransactionsService } from './transactions.service';
+
+@Module({
+  controllers: [TransactionsController],
+  providers: [TransactionsService],
+})
+export class TransactionsModule {}
+
+
+--- FIN ARCHIVO: src\transactions\transactions.module.ts ---
+
+
+--- INICIO ARCHIVO: src\transactions\transactions.service.ts ---
+
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma, Transaction } from '@prisma/client';
+import {
+  CreateTransactionDto,
+  TransactionType,
+} from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { QueryTransactionDto } from './dto/query-transaction.dto';
+import { AppLogger } from '../common/utils/logger.util';
+
+import {
+  PaginatedResult,
+  createPaginatedResponse,
+} from '../common/dto/pagination.dto';
+
+@Injectable()
+export class TransactionsService {
+  private readonly logger = new AppLogger(TransactionsService.name);
+
+  constructor(private prisma: PrismaService) {}
+
+  async create(dto: CreateTransactionDto, userId: string) {
+    const { accountId, amount, type, ...rest } = dto;
+
+    this.logger.logOperation('Create transaction', {
+      type,
+      amount,
+      accountId,
+      userId,
+    });
+
+    // 1. Validar Cuenta (Account)
+    const account = await this.prisma.account.findUnique({
+      // 👈 prisma.account
+      where: { id: accountId, userId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(
+        'Cuenta no encontrada o no pertenece al usuario',
+      );
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        // A. Crear la transacción
+        const newTransaction = await tx.transaction.create({
+          data: {
+            ...rest,
+            amount,
+            type,
+            userId,
+            accountId, // 👈 Ahora coinciden DTO y Schema, asignación directa
+            currency: account.currency,
+          },
+          include: {
+            category: true,
+            account: true, // 👈 Relación actualizada
+          },
+        });
+
+        // B. Calcular impacto
+        const operation =
+          type === TransactionType.INCOME ? 'increment' : 'decrement';
+
+        // C. Actualizar la cuenta
+        await tx.account.update({
+          // 👈 tx.account
+          where: { id: accountId },
+          data: {
+            balance: {
+              [operation]: amount,
+            },
+          },
+        });
+
+        return newTransaction;
+      });
+
+      this.logger.logSuccess('Create transaction', {
+        id: result.id,
+        newBalance: Number(result.account?.balance || 0), // 👈 result.account
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.logFailure('Create transaction', error as Error);
+      throw error;
+    }
+  }
+
+  async findAll(
+    query: QueryTransactionDto,
+    userId: string,
+  ): Promise<PaginatedResult<Transaction>> {
+    const {
+      page = 1,
+      limit = 20,
+      type,
+      startDate,
+      endDate,
+      categoryId,
+      accountId,
+      year,
+      month,
+      search,
+    } = query;
+
+    this.logger.log(
+      `Finding transactions for user ${userId} with filters: ${JSON.stringify(query)}`,
+    );
+
+    const where: Prisma.TransactionWhereInput = {
+      userId,
+      deletedAt: null,
+    };
+
+    // Mapeo de filtros
+    if (accountId) where.accountId = accountId; // 👈 where.accountId
+    if (type) where.type = type;
+    if (categoryId) where.categoryId = categoryId;
+
+    if (search) {
+      where.OR = [
+        { description: { contains: search, mode: 'insensitive' } },
+        { category: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    let filterStart = startDate ? new Date(startDate) : undefined;
+    let filterEnd = endDate ? new Date(endDate) : undefined;
+
+    if (!filterStart && !filterEnd && month && year) {
+      filterStart = new Date(year, month - 1, 1);
+      filterEnd = new Date(year, month, 0, 23, 59, 59, 999);
+    }
+
+    if (filterStart || filterEnd) {
+      where.date = {};
+      if (filterStart) where.date.gte = filterStart;
+      if (filterEnd) where.date.lte = filterEnd;
+    }
+
+    const skip = (page - 1) * limit;
+
+    try {
+      const [data, total] = await Promise.all([
+        this.prisma.transaction.findMany({
+          where,
+          skip,
+          take: limit,
+          include: {
+            category: true,
+            account: true, // 👈 Include account
+          },
+          orderBy: { date: 'desc' },
+        }),
+        this.prisma.transaction.count({ where }),
+      ]);
+
+      this.logger.logSuccess('Find transactions', {
+        count: data.length,
+        total,
+      });
+
+      return createPaginatedResponse<Transaction>(data, total, page, limit);
+    } catch (error) {
+      this.logger.logFailure('Find all transactions', error as Error);
+      throw error;
+    }
+  }
+
+  async getBalance(userId: string) {
+    this.logger.log(`Calculating global balance for user ${userId}`);
+
+    try {
+      // 👈 prisma.account
+      const accounts = await this.prisma.account.findMany({
+        where: { userId },
+        select: { balance: true, currency: true },
+      });
+
+      const balanceByCurrency: Record<string, number> = {};
+
+      accounts.forEach((acc) => {
+        const amount = Number(acc.balance);
+        if (!balanceByCurrency[acc.currency]) {
+          balanceByCurrency[acc.currency] = 0;
+        }
+        balanceByCurrency[acc.currency] += amount;
+      });
+
+      this.logger.logSuccess('Calculate balance', { balanceByCurrency });
+
+      return {
+        netWorth: balanceByCurrency,
+      };
+    } catch (error) {
+      this.logger.logFailure('Calculate balance', error as Error);
+      throw error;
+    }
+  }
+
+  async update(id: string, dto: UpdateTransactionDto, userId: string) {
+    this.logger.logOperation('Update transaction', { id, userId });
+
+    const oldTransaction = await this.findOne(id, userId);
+
+    if (!oldTransaction.accountId) {
+      // 👈 oldTransaction.accountId
+      throw new BadRequestException(
+        'La transacción original no tiene una cuenta asociada válida.',
+      );
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 1. REVERTIR el impacto anterior
+        const oldType = oldTransaction.type as TransactionType;
+        const reverseOp =
+          oldType === TransactionType.INCOME ? 'decrement' : 'increment';
+
+        await tx.account.update({
+          // 👈 tx.account
+          where: { id: oldTransaction.accountId },
+          data: { balance: { [reverseOp]: oldTransaction.amount } },
+        });
+
+        // 2. APLICAR nueva transacción
+        const newAmount =
+          dto.amount !== undefined ? dto.amount : oldTransaction.amount;
+        const newType = dto.type
+          ? dto.type
+          : (oldTransaction.type as TransactionType);
+
+        const newAccountId = dto.accountId || oldTransaction.accountId;
+
+        // Cambio de cuenta
+        if (dto.accountId && dto.accountId !== oldTransaction.accountId) {
+          const newAccount = await tx.account.findUnique({
+            where: { id: dto.accountId, userId },
+          });
+          if (!newAccount)
+            throw new NotFoundException('Nueva cuenta no encontrada');
+        }
+
+        const applyOp =
+          newType === TransactionType.INCOME ? 'increment' : 'decrement';
+
+        await tx.account.update({
+          // 👈 tx.account
+          where: { id: newAccountId },
+          data: { balance: { [applyOp]: newAmount } },
+        });
+
+        // 3. Actualizar registro
+        return tx.transaction.update({
+          where: { id },
+          data: {
+            ...dto,
+            accountId: dto.accountId, // 👈 Asignación directa
+          },
+          include: { category: true },
+        });
+      });
+
+      this.logger.logSuccess('Update transaction', { id: result.id });
+      return result;
+    } catch (error) {
+      this.logger.logFailure('Update transaction', error as Error);
+      throw error;
+    }
+  }
+
+  async remove(id: string, userId: string) {
+    this.logger.logOperation('Delete transaction', { id, userId });
+
+    const transaction = await this.findOne(id, userId);
+
+    if (!transaction.accountId) {
+      // 👈 transaction.accountId
+      throw new BadRequestException(
+        'La transacción no tiene una cuenta asociada para revertir el saldo.',
+      );
+    }
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Revertir saldo
+        const typeEnum = transaction.type as TransactionType;
+        const operation =
+          typeEnum === TransactionType.INCOME ? 'decrement' : 'increment';
+
+        await tx.account.update({
+          // 👈 tx.account
+          where: { id: transaction.accountId },
+          data: {
+            balance: { [operation]: transaction.amount },
+          },
+        });
+
+        // 2. Soft Delete
+        await tx.transaction.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        });
+      });
+
+      this.logger.logSuccess('Delete transaction', { id });
+      return {
+        message: 'Transaction deleted and balance restored successfully',
+      };
+    } catch (error) {
+      this.logger.logFailure('Delete transaction', error as Error);
+      throw error;
+    }
+  }
+
+  async findOne(id: string, userId: string) {
+    const transaction = await this.prisma.transaction.findFirst({
+      where: { id, userId, deletedAt: null },
+      include: { category: true },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+    return transaction;
+  }
+}
+
+
+--- FIN ARCHIVO: src\transactions\transactions.service.ts ---
+
+
+--- INICIO ARCHIVO: src\user\dto\create-user.dto.ts ---
+
+import { IsString, IsEmail, MinLength, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class CreateUserDto {
+  @ApiProperty({ description: 'Email único del usuario' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ description: 'Nombre completo' })
+  @IsString()
+  @MinLength(2)
+  name: string;
+
+  @ApiProperty({ description: 'Contraseña (se hasheará en el servicio)' })
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @ApiPropertyOptional({ description: 'Moneda por defecto', default: 'ARS' })
+  @IsOptional()
+  @IsString()
+  currency?: string;
+}
+
+
+--- FIN ARCHIVO: src\user\dto\create-user.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\user\dto\update-user.dto.ts ---
+
+import { IsString, IsOptional, IsInt, Min, Max, Length } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+
+export class UpdateUserDto {
+  @ApiPropertyOptional({ description: 'Nombre del usuario' })
+  @IsOptional()
+  @IsString()
+  @Length(2, 50)
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Moneda preferida (ej: ARS, USD)' })
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currency?: string;
+
+  @ApiPropertyOptional({ description: 'Día de inicio del mes fiscal (1-28)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(28)
+  fiscalStartDay?: number;
+}
+
+
+--- FIN ARCHIVO: src\user\dto\update-user.dto.ts ---
+
+
+--- INICIO ARCHIVO: src\user\users.controller.ts ---
+
+import { Controller, Get, Body, Patch, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { UsersService } from './users.service';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+@ApiTags('Users')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard) // 👈 Todo este controlador requiere login
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get('me')
+  @ApiOperation({ summary: 'Obtener mi perfil de usuario' })
+  getProfile(@CurrentUser('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  @Patch('me')
+  @ApiOperation({
+    summary: 'Actualizar mi perfil (Nombre, Moneda, Cierre Fiscal)',
+  })
+  updateProfile(
+    @CurrentUser('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return this.usersService.update(id, updateUserDto);
+  }
+}
+
+
+--- FIN ARCHIVO: src\user\users.controller.ts ---
+
+
+--- INICIO ARCHIVO: src\user\users.module.ts ---
+
+import { Module } from '@nestjs/common';
+import { UsersService } from './users.service';
+import { UsersController } from './users.controller';
+import { PrismaModule } from '../../prisma/prisma.module';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [UsersController],
+  providers: [UsersService],
+  exports: [UsersService], // 👈 Exportamos el servicio por si Auth lo necesita
+})
+export class UsersModule {}
+
+
+--- FIN ARCHIVO: src\user\users.module.ts ---
+
+
+--- INICIO ARCHIVO: src\user\users.service.ts ---
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class UsersService {
+  constructor(private prisma: PrismaService) {}
+
+  async create(createUserDto: CreateUserDto) {
+    const { password, ...userData } = createUserDto;
+
+    // Hasheamos la password aquí para asegurar que NUNCA se guarde texto plano
+    // incluso si el usuario se crea desde el panel de Admin
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    return this.prisma.user.create({
+      data: {
+        ...userData,
+        password: hashedPassword,
+      },
+    });
+  }
+
+  // Obtener perfil (sin password)
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    // Eliminamos la password antes de devolverlo (Seguridad)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...result } = user;
+    return result;
+  }
+
+  // Actualizar perfil
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: updateUserDto,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...result } = user;
+    return result;
+  }
+}
+
+
+--- FIN ARCHIVO: src\user\users.service.ts ---
+
+
+--- INICIO ARCHIVO: test\app.e2e-spec.ts ---
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { App } from 'supertest/types';
+import { AppModule } from './../src/app.module';
+
+describe('AppController (e2e)', () => {
+  let app: INestApplication<App>;
+
+  beforeEach(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  it('/ (GET)', () => {
+    return request(app.getHttpServer())
+      .get('/')
+      .expect(200)
+      .expect('Hello World!');
+  });
+});
+
+
+--- FIN ARCHIVO: test\app.e2e-spec.ts ---
+
+
+--- INICIO ARCHIVO: test\jest-e2e.json ---
+
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  }
+}
+
+
+--- FIN ARCHIVO: test\jest-e2e.json ---
+
+
+--- INICIO ARCHIVO: tsconfig.build.json ---
+
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]
+}
+
+
+--- FIN ARCHIVO: tsconfig.build.json ---
+
+
+--- INICIO ARCHIVO: tsconfig.json ---
+
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  }
+}
+
+
+--- FIN ARCHIVO: tsconfig.json ---
