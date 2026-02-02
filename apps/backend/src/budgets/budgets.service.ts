@@ -106,6 +106,13 @@ export class BudgetsService {
           const remaining = limit - spent;
           const percentage = limit > 0 ? Math.round((spent / limit) * 100) : 0;
 
+          let status = 'OK';
+          if (percentage >= 100) {
+            status = 'EXCEEDED';
+          } else if (percentage >= 80) {
+            status = 'WARNING';
+          }
+
           // E. Retorno con nombres que espera el Frontend
           return {
             id: budget.id,
@@ -117,7 +124,7 @@ export class BudgetsService {
             spent: spent,
             remaining,
             percentage,
-            status: percentage > 100 ? 'EXCEEDED' : 'OK',
+            status,
           };
         }),
       );

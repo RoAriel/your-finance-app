@@ -1,6 +1,14 @@
 import { api } from '../../../lib/axios';
 import type { Account, CreateAccountDTO, UpdateAccountDTO } from '../types';
 
+export interface TransferDTO {
+  sourceAccountId: string;
+  targetAccountId: string;
+  amount: number;
+  description?: string;
+  date: string; // Importante para el historial
+}
+
 export const accountsService = {
   // Trae TODAS las cuentas. El filtrado visual lo haremos en el hook o componente.
   getAll: async (): Promise<Account[]> => {
@@ -25,5 +33,9 @@ export const accountsService = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/accounts/${id}`);
+  },
+
+  transfer: async (dto: TransferDTO): Promise<void> => {
+    await api.post('/accounts/transfer', dto);
   },
 };

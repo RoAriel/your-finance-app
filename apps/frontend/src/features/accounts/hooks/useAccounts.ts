@@ -7,6 +7,7 @@ import type {
   AccountType,
 } from '../types';
 
+import type { TransferDTO } from '../services/accounts.service';
 interface UseAccountsProps {
   type?: AccountType; // Filtro opcional: Si pasas 'WALLET', solo devuelve billeteras
 }
@@ -53,6 +54,16 @@ export const useAccounts = ({ type }: UseAccountsProps = {}) => {
     },
   });
 
+  const transferMutation = useMutation({
+    mutationFn: (data: TransferDTO) => accountsService.transfer(data),
+    onSuccess: () => {
+      // Invalidamos cuentas (saldos) y transacciones (historial)
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
   return {
     accounts: query.data || [],
     isLoading: query.isLoading,
@@ -61,7 +72,8 @@ export const useAccounts = ({ type }: UseAccountsProps = {}) => {
     createAccount: createMutation.mutateAsync,
     updateAccount: updateMutation.mutateAsync,
     deleteAccount: deleteMutation.mutateAsync,
-
+    transfer: transferMutation.mutateAsync,
+    isTransferring: transferMutation.isPending,
     isCreating: createMutation.isPending,
   };
 };

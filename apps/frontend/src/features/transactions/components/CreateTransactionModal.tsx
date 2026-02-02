@@ -1,15 +1,13 @@
 import { X } from 'lucide-react';
 import { useState } from 'react';
+import type { Transaction } from '../types';
+import { AccountType } from '../../accounts/types';
+import { CategorySelector } from '../../../components/common/CategorySelector';
+import { AccountSelector } from '../../../components/common/AccountSelector';
 import {
   useCreateTransaction,
   useUpdateTransaction,
 } from '../hooks/useTransactions';
-import type { Transaction } from '../types';
-import { CategorySelector } from '../../../components/common/CategorySelector';
-// 👇 Importamos el nuevo selector y tipos
-import { AccountSelector } from '../../../components/common/AccountSelector';
-import { AccountType } from '../../accounts/types';
-
 interface Props {
   isOpen: boolean;
   onClose: () => void;
