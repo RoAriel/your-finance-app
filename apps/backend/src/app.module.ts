@@ -9,6 +9,8 @@ import { AccountsModule } from './account/accounts.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ReportsModule } from './reports/reports.module';
 import { UsersModule } from './user/users.module';
+import { MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { LoggerMiddleware } from './logger.middleware';
 
 @Module({
   imports: [
@@ -24,4 +26,8 @@ import { UsersModule } from './user/users.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggerMiddleware).forRoutes('*');
+  }
+}

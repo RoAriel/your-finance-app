@@ -18,7 +18,12 @@ enum SubscriptionTier {
   PRO
 }
 
-// 👇 NUEVO ENUM (Identidad de la cuenta)
+enum CategoryType {
+  INCOME
+  EXPENSE
+  BOTH
+}
+
 enum AccountType {
   WALLET        // Efectivo, Banco, Billetera Virtual (Flujo diario)
   SAVINGS       // Metas, Ahorros (Acumulación)
@@ -103,6 +108,11 @@ model Category {
   color   String? 
   icon    String? 
   
+  // 👇 NUEVO: Jerarquía (Auto-relación)
+  parentId  String?   @map("parent_id")
+  parent    Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryHierarchy")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -112,7 +122,10 @@ model Category {
   transactions Transaction[]
   budgets      Budget[]
   
-  @@unique([userId, name, type])
+  // Constraints
+  // OJO: Agregamos parentId al unique para permitir "Servicios -> Otros" y "Comida -> Otros"
+  // Si parentId es null, es categoría raíz.
+  @@unique([userId, name, type, parentId]) 
   @@index([userId])
   @@map("categories")
 }

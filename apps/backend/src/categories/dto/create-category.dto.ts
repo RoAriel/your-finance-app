@@ -6,13 +6,14 @@ import {
   MinLength,
   MaxLength,
   Matches,
+  IsUUID,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum CategoryType {
-  INCOME = 'income',
-  EXPENSE = 'expense',
-  BOTH = 'both',
+  INCOME = 'INCOME', // <--- Coincide con Prisma
+  EXPENSE = 'EXPENSE', // <--- Coincide con Prisma
+  BOTH = 'BOTH', // <--- Coincide con Prisma
 }
 
 export class CreateCategoryDto {
@@ -44,4 +45,12 @@ export class CreateCategoryDto {
   @IsOptional() // Opcional porque tiene default en BD
   @IsBoolean()
   isFixed?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'ID de la categoría padre (si es una subcategoría)',
+    example: 'uuid-de-servicios',
+  })
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
 }

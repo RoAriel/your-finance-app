@@ -9,7 +9,7 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = 'admin@admin';
+  const email = 'admin@admin.com';
 
   // 1. Verificar si ya existe
   const existingAdmin = await prisma.user.findUnique({ where: { email } });

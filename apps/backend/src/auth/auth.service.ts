@@ -9,77 +9,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-// 👇 Importamos el Enum
 import { AccountType } from '@prisma/client';
-
-// 📋 LISTA DE CATEGORÍAS DEFAULT (KIT DE BIENVENIDA)
-const DEFAULT_CATEGORIES = [
-  // INGRESOS
-  {
-    name: 'Sueldo',
-    type: 'INCOME',
-    icon: 'briefcase',
-    color: '#10B981',
-    isFixed: true,
-  },
-  {
-    name: 'Ahorros',
-    type: 'INCOME',
-    icon: 'briefcase',
-    color: '#10B981',
-    isFixed: true,
-  },
-  // GASTOS
-  {
-    name: 'Café / Restaurante',
-    type: 'EXPENSE',
-    icon: 'cart',
-    color: '#F59E0B',
-    isFixed: false,
-  },
-  {
-    name: 'Transporte',
-    type: 'EXPENSE',
-    icon: 'bus',
-    color: '#3B82F6',
-    isFixed: false,
-  },
-  {
-    name: 'Servicios',
-    type: 'EXPENSE',
-    icon: 'bulb',
-    color: '#EF4444',
-    isFixed: true,
-  },
-  {
-    name: 'Alquiler / Casa',
-    type: 'EXPENSE',
-    icon: 'home',
-    color: '#8B5CF6',
-    isFixed: true,
-  },
-  {
-    name: 'Ocio / Salidas',
-    type: 'EXPENSE',
-    icon: 'party',
-    color: '#EC4899',
-    isFixed: false,
-  },
-  {
-    name: 'Salud',
-    type: 'EXPENSE',
-    icon: 'heart',
-    color: '#EF4444',
-    isFixed: false,
-  },
-  {
-    name: 'Supermercado',
-    type: 'EXPENSE',
-    icon: 'shopping-cart',
-    color: '#10B981',
-    isFixed: false,
-  },
-];
+import { DEFAULT_CATEGORIES_HIERARCHY } from '../common/constants/default-categories';
 
 @Injectable()
 export class AuthService {
@@ -101,43 +32,71 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4. TRANSACCIÓN: Usuario + Cuenta WALLET Default + Categorías
-    const newUser = await this.prisma.$transaction(async (tx) => {
-      // A. Crear Usuario
-      const user = await tx.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          name,
-          currency,
-          fiscalStartDay: 1,
-        },
-      });
+    // Utilizamos una transacción para asegurar que se cree todo o nada
+    const newUser = await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Crear Usuario
+        const user = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name,
+            currency,
+            fiscalStartDay: 1,
+          },
+        });
 
-      // B. Crear su Billetera Principal (WALLET)
-      await tx.account.create({
-        // 👈 Usamos tx.account
-        data: {
-          name: 'Efectivo / Billetera',
-          userId: user.id,
-          type: AccountType.WALLET, // 👈 Identidad explícita
-          currency: currency,
-          icon: 'wallet',
-          color: '#10B981',
-          balance: 0,
-          isDefault: true,
-        },
-      });
+        // 2. Crear Billetera Default
+        await tx.account.create({
+          data: {
+            name: 'Efectivo / Billetera',
+            userId: user.id,
+            type: AccountType.WALLET,
+            currency: currency,
+            icon: 'wallet',
+            color: '#10B981',
+            balance: 0,
+            isDefault: true,
+          },
+        });
 
-      // C. Crear Categorías Básicas
-      await tx.category.createMany({
-        data: DEFAULT_CATEGORIES.map((cat) => ({
-          ...cat,
-          userId: user.id,
-        })),
-      });
-      return user;
-    });
+        // 3. Crear Categorías Iniciales
+        for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
+          const parent = await tx.category.create({
+            data: {
+              name: catData.name,
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+              type: catData.type as any,
+              color: catData.color,
+              icon: catData.icon,
+              isFixed: catData.isFixed,
+              userId: user.id,
+            },
+          });
+
+          if (catData.children && catData.children.length > 0) {
+            await tx.category.createMany({
+              data: catData.children.map((child) => ({
+                name: child.name,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                type: child.type as any,
+                color: child.color,
+                icon: child.icon,
+                isFixed: child.isFixed,
+                parentId: parent.id,
+                userId: user.id,
+              })),
+            });
+          }
+        }
+
+        return user;
+      },
+      {
+        maxWait: 5000, // Tiempo máx esperando conexión del pool
+        timeout: 20000, // Tiempo máx para ejecutar toda la transacción (por la latencia de DB)
+      },
+    );
 
     const token = this.generateToken(newUser.id, newUser.email);
 
@@ -153,19 +112,18 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    // ... (Tu código de login se mantiene igual)
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const token = this.generateToken(user.id, user.email);

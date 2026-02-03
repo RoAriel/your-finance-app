@@ -30,7 +30,7 @@ function readDirectory(dir) {
           stream.write(content);
           stream.write(`\n\n--- FIN ARCHIVO: ${filePath} ---\n`);
         } catch (err) {
-          console.error(`No se pudo leer el archivo ${filePath}: ${err.message}`);
+          console.error(`No se pudo leer el archivo ${filePath}: ${err.message}!`);
         }
       }
     }
