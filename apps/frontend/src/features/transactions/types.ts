@@ -1,4 +1,7 @@
-// 1. Definimos la Categoría anidada (solo lo que vemos en el JSON)
+// 👇 1. IMPORTANTE: Traemos el Enum (La nueva fuente de verdad)
+import { CategoryType } from '../categories/types';
+
+// 1. Definimos la Categoría anidada
 export interface TransactionCategory {
   id: string;
   name: string;
@@ -11,18 +14,19 @@ export interface TransactionCategory {
 export interface Transaction {
   id: string;
   userId: string;
-  type: 'income' | 'expense' | 'bouth' | 'transfer';
-  amount: string; // ¡OJO! El backend lo manda como string
+  type: CategoryType;
+
+  amount: string; // El backend manda string (Decimal de Prisma)
   currency: string;
   description: string;
-  date: string; // ISO String ("2026-01-18T...")
+  date: string; // ISO String
   categoryId: string;
-  category?: TransactionCategory; // Puede venir o no, según el backend
+  category?: TransactionCategory;
   accountId: string;
   createdAt: string;
 }
 
-// 3. Definimos la Paginación (meta)
+// 3. Paginación (Sin cambios)
 export interface PaginationMeta {
   page: number;
   limit: number;
@@ -32,33 +36,37 @@ export interface PaginationMeta {
   hasPreviousPage: boolean;
 }
 
-// 4. La respuesta completa de la API
+// 4. Respuesta API (Sin cambios)
 export interface TransactionsResponse {
   data: Transaction[];
   meta: PaginationMeta;
 }
 
+// 5. Balance (Sin cambios)
 export interface BalanceResponse {
   income: number;
   expenses: number;
   balance: number;
 }
 
+// 6. DTO de Creación
 export interface CreateTransactionDTO {
-  amount: number;
+  amount: number; // Aquí el form usa number
   description: string;
   categoryId: string;
-  accountId: string; // 👈 AGREGADO: Campo obligatorio en el nuevo modelo
+  accountId: string;
   date: string;
-  type: 'income' | 'expense';
+  type: CategoryType;
   currency: string;
 }
-// 6. Filtros para la consulta
+
+// 7. Filtros
 export interface TransactionFilters {
-  month?: number; // 1-12
-  year?: number; // 2026
+  month?: number;
+  year?: number;
   page?: number;
   limit?: number;
 }
-// Partial hace que todos los campos de Create sean opcionales
+
+// 8. Update DTO
 export type UpdateTransactionDTO = Partial<CreateTransactionDTO>;

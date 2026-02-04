@@ -1,11 +1,18 @@
+import { useMemo } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useCategories } from '../../features/categories/hooks/useCategories';
+import { CategoryType } from '../../features/categories/types';
+import { buildCategoryTree } from '../../utils/category-tree';
+import type { CategoryNode } from '../../utils/category-tree';
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  type?: string;
+  type: CategoryType;
   placeholder?: string;
   className?: string;
+  excludeId?: string;
+  disabled?: boolean;
 }
 
 export const CategorySelector = ({
@@ -14,28 +21,56 @@ export const CategorySelector = ({
   type,
   placeholder = 'Selecciona una categoría...',
   className = '',
+  excludeId,
+  disabled = false,
 }: Props) => {
-  // TypeScript ahora sabe que 'response' es PaginatedResponse<Category> | undefined
-  const { data: response, isLoading } = useCategories();
+  const { categories, isLoading } = useCategories(type);
 
-  // 👇 Lógica limpia y sin 'any'.
-  // Como ya tipamos el servicio, TS sabe que response tiene .data
-  const rawList = response?.data || [];
+  const tree = useMemo(() => {
+    if (!categories) return [];
 
-  const categories = type
-    ? rawList.filter((cat) => {
-        const catType = cat.type?.toUpperCase();
-        const reqType = type.toUpperCase();
-        return catType === reqType || catType === 'BOTH';
+    let filtered = categories.filter((cat) => {
+      const catType = cat.type;
+      return catType === type || catType === CategoryType.BOTH;
+    });
+
+    if (excludeId) {
+      filtered = filtered.filter((c) => c.id !== excludeId);
+    }
+
+    return buildCategoryTree(filtered);
+  }, [categories, type, excludeId]);
+
+  const renderOptions = (
+    nodes: CategoryNode[],
+    level = 0
+  ): React.ReactNode[] => {
+    return nodes
+      .map((node) => {
+        // 🎨 MEJORA VISUAL AQUÍ:
+        // Usamos espacios en blanco reales (\u00A0) para empujar el texto.
+        // Si es hijo (level > 0), ponemos una flecha curva suave '↳'
+        const indent = '\u00A0\u00A0\u00A0'.repeat(level);
+        const symbol = level > 0 ? '↳ ' : '';
+
+        // Nota: Eliminamos {node.icon} para que no imprima el texto "shopping-cart"
+        const label = `${indent}${symbol}${node.name}`;
+
+        return [
+          <option key={node.id} value={node.id}>
+            {label}
+          </option>,
+          ...(node.children.length > 0
+            ? renderOptions(node.children, level + 1)
+            : []),
+        ];
       })
-    : rawList;
+      .flat();
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 p-2.5 text-sm text-gray-400 bg-gray-50 rounded-lg border border-gray-200">
-        <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin"></div>
-        <span>Cargando...</span>
-      </div>
+      <div className="animate-pulse h-10 bg-gray-100 rounded-lg w-full border border-gray-200"></div>
     );
   }
 
@@ -44,38 +79,15 @@ export const CategorySelector = ({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all bg-white text-gray-700 appearance-none ${className}`}
+        disabled={disabled}
+        className={`w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm rounded-lg appearance-none bg-white truncate cursor-pointer ${className} ${disabled ? 'bg-gray-100 text-gray-400' : 'text-gray-700'}`}
       >
-        <option value="" disabled>
-          {placeholder}
-        </option>
-
-        {categories.length > 0 ? (
-          categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
-          ))
-        ) : (
-          <option value="" disabled>
-            No hay categorías disponibles
-          </option>
-        )}
+        <option value="">{placeholder}</option>
+        {renderOptions(tree)}
       </select>
-      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500">
-        <svg
-          className="w-4 h-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M19 9l-7 7-7-7"
-          ></path>
-        </svg>
+
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+        <ChevronRight size={16} className="rotate-90" />
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useBudgets } from '../hooks/useBudgets';
 import type { Budget } from '../services/budgets.service';
 // 👇 1. Importamos tu nuevo componente reutilizable
 import { CategorySelector } from '../../../components/common/CategorySelector';
+import { CategoryType } from '../../categories/types';
 
 interface Props {
   isOpen: boolean;
@@ -90,7 +91,7 @@ export const CreateBudgetModal = ({
               <CategorySelector
                 value={categoryId}
                 onChange={setCategoryId}
-                type="EXPENSE" // 👈 Solo categorías de Gasto
+                type={CategoryType.EXPENSE}
                 placeholder="Categoría a presupuestar..."
               />
             </div>

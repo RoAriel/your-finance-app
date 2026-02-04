@@ -1,13 +1,15 @@
+import { useState } from 'react'; // 👈 Adiós useEffect
 import { X } from 'lucide-react';
-import { useState } from 'react';
 import type { Transaction } from '../types';
 import { AccountType } from '../../accounts/types';
+import { CategoryType } from '../../categories/types';
 import { CategorySelector } from '../../../components/common/CategorySelector';
 import { AccountSelector } from '../../../components/common/AccountSelector';
 import {
   useCreateTransaction,
   useUpdateTransaction,
 } from '../hooks/useTransactions';
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
@@ -22,13 +24,19 @@ export const CreateTransactionModal = ({
   const createMutation = useCreateTransaction();
   const updateMutation = useUpdateTransaction();
   const isEditing = !!transactionToEdit;
-
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
-  // ESTADOS
-  const [type, setType] = useState<Transaction['type']>(
-    transactionToEdit?.type || 'expense'
-  );
+  // --- ESTADOS (Inicialización Directa) ---
+  // Al usar renderizado condicional en el padre, estos se reinician solos al abrirse.
+
+  const [type, setType] = useState<CategoryType>(() => {
+    // Lógica segura para determinar el tipo inicial
+    if (transactionToEdit?.type === CategoryType.INCOME) {
+      return CategoryType.INCOME;
+    }
+    return CategoryType.EXPENSE;
+  });
+
   const [amount, setAmount] = useState(
     transactionToEdit?.amount?.toString() || ''
   );
@@ -41,35 +49,41 @@ export const CreateTransactionModal = ({
   const [categoryId, setCategoryId] = useState(
     transactionToEdit?.categoryId || ''
   );
-  // 👇 Nuevo estado para la Cuenta
   const [accountId, setAccountId] = useState(
     transactionToEdit?.accountId || ''
   );
 
   // Fecha
-  const initialDate = transactionToEdit?.date
-    ? new Date(transactionToEdit.date).toISOString().split('T')[0]
-    : new Date().toISOString().split('T')[0];
-  const [date, setDate] = useState(initialDate);
+  const [date, setDate] = useState(() => {
+    if (transactionToEdit?.date) {
+      return new Date(transactionToEdit.date).toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  });
 
-  const handleTypeChange = (newType: Transaction['type']) => {
+  // ❌ BORRADO: useEffect eliminado.
+
+  // --- HANDLERS ---
+
+  const handleTypeChange = (newType: CategoryType) => {
     setType(newType);
+    // Solo limpiamos la categoría si cambiamos de tipo (Gasto <-> Ingreso)
+    // porque las categorías de uno no sirven para el otro.
     setCategoryId('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 👇 Validamos accountId
     if (!amount || !categoryId || !description || !accountId) return;
 
     const transactionData = {
       amount: parseFloat(amount),
       description,
       date: new Date(date).toISOString(),
-      type: type as 'income' | 'expense',
+      type: type,
       categoryId,
-      accountId, // 👈 Enviamos la cuenta seleccionada
+      accountId,
       currency,
     };
 
@@ -110,12 +124,11 @@ export const CreateTransactionModal = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Tabs Tipo */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
-            {/* ... (código de tabs igual que antes) ... */}
             <button
               type="button"
-              onClick={() => handleTypeChange('expense')}
+              onClick={() => handleTypeChange(CategoryType.EXPENSE)}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === 'expense'
+                type === CategoryType.EXPENSE
                   ? 'bg-white text-red-600 shadow-sm'
                   : 'text-gray-500'
               }`}
@@ -124,9 +137,9 @@ export const CreateTransactionModal = ({
             </button>
             <button
               type="button"
-              onClick={() => handleTypeChange('income')}
+              onClick={() => handleTypeChange(CategoryType.INCOME)}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === 'income'
+                type === CategoryType.INCOME
                   ? 'bg-white text-green-600 shadow-sm'
                   : 'text-gray-500'
               }`}
@@ -135,13 +148,16 @@ export const CreateTransactionModal = ({
             </button>
           </div>
 
-          {/* 👇 Selector de Cuenta (NUEVO) */}
-          {/* Filtramos solo WALLET porque normalmente gastas/cobras en billeteras */}
+          {/* Selector de Cuenta */}
           <AccountSelector
             value={accountId}
             onChange={setAccountId}
             type={AccountType.WALLET}
-            label={type === 'income' ? 'Destino (Cuenta)' : 'Origen (Cuenta)'}
+            label={
+              type === CategoryType.INCOME
+                ? 'Destino (Cuenta)'
+                : 'Origen (Cuenta)'
+            }
             placeholder="Selecciona la cuenta..."
           />
 
@@ -186,12 +202,12 @@ export const CreateTransactionModal = ({
             <CategorySelector
               value={categoryId}
               onChange={setCategoryId}
-              type={type === 'expense' ? 'EXPENSE' : 'INCOME'}
+              type={type}
               placeholder="Selecciona una categoría..."
             />
           </div>
 
-          {/* Descripción y Fecha (Igual que antes) */}
+          {/* Descripción */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Descripción
@@ -204,6 +220,8 @@ export const CreateTransactionModal = ({
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
+
+          {/* Fecha */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Fecha
@@ -221,7 +239,7 @@ export const CreateTransactionModal = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isLoading || !accountId} // 👈 Bloqueamos si no hay cuenta
+              disabled={isLoading || !accountId}
               className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {isLoading
