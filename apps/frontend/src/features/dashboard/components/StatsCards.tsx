@@ -1,79 +1,87 @@
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react';
-import { useCurrency } from '../../../hooks/useCurrency';
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+} from 'lucide-react';
+import { formatCurrency } from '../../../utils/formatters';
 
-// 1. Definimos la "forma" de los datos que esperamos recibir
-interface StatsCardsProps {
+interface Props {
   income: number;
   expenses: number;
   balance: number;
-  isLoading?: boolean;
+  isLoading: boolean;
 }
 
-export const StatsCards = ({
-  income = 0,
-  expenses = 0,
-  balance = 0,
-  isLoading = false,
-}: StatsCardsProps) => {
-  const { format } = useCurrency(); // Usamos tu formateador global
-
-  // 2. Estado de Carga (Skeleton) para que no parpadee feo
+export const StatsCards = ({ income, expenses, balance, isLoading }: Props) => {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-32 animate-pulse"
-          >
-            <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
-            <div className="h-8 bg-gray-200 rounded w-2/3"></div>
-          </div>
+            className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-pulse h-32"
+          />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* CARD INGRESOS */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 1. Saldo Total (Liquidez) */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+          <Wallet size={80} className="text-blue-600" />
+        </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Ingresos</p>
-          <h3 className="text-2xl font-bold text-gray-800 mt-1">
-            {format(income)}
+          <p className="text-gray-500 text-sm font-medium mb-1">
+            Saldo Disponible
+          </p>
+          <h3 className="text-2xl font-bold text-gray-800">
+            {formatCurrency(balance)}
           </h3>
         </div>
-        <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-          <TrendingUp size={24} />
+        <div className="mt-4 flex items-center gap-2 text-xs font-medium text-blue-600 bg-blue-50 w-fit px-2 py-1 rounded-lg">
+          <Wallet size={14} />
+          <span>En Billeteras</span>
         </div>
       </div>
 
-      {/* CARD GASTOS */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+      {/* 2. Ingresos del Mes */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+          <TrendingUp size={80} className="text-green-600" />
+        </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Gastos</p>
-          <h3 className="text-2xl font-bold text-gray-800 mt-1">
-            {format(expenses)}
+          <p className="text-gray-500 text-sm font-medium mb-1">
+            Ingresos (Mes)
+          </p>
+          <h3 className="text-2xl font-bold text-gray-800">
+            {formatCurrency(income)}
           </h3>
         </div>
-        <div className="p-3 bg-red-100 rounded-full text-red-600">
-          <TrendingDown size={24} />
+        <div className="mt-4 flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg">
+          <ArrowUpRight size={14} />
+          <span>Entradas registradas</span>
         </div>
       </div>
 
-      {/* CARD BALANCE */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between">
+      {/* 3. Gastos del Mes */}
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-shadow">
+        <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+          <TrendingDown size={80} className="text-red-600" />
+        </div>
         <div>
-          <p className="text-gray-500 text-sm font-medium">Balance Total</p>
-          <h3
-            className={`text-2xl font-bold mt-1 ${balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}
-          >
-            {format(balance)}
+          <p className="text-gray-500 text-sm font-medium mb-1">Gastos (Mes)</p>
+          <h3 className="text-2xl font-bold text-gray-800">
+            {formatCurrency(expenses)}
           </h3>
         </div>
-        <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-          <Wallet size={24} />
+        <div className="mt-4 flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 w-fit px-2 py-1 rounded-lg">
+          <ArrowDownRight size={14} />
+          <span>Salidas registradas</span>
         </div>
       </div>
     </div>
