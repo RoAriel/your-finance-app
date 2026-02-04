@@ -67,6 +67,9 @@ export interface CreateTransactionDTO {
   date: string;
   type: TransactionType;
   currency: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 // 7. Filtros

@@ -12,6 +12,9 @@ interface TransactionFilters {
   page?: number;
   limit?: number;
   search?: string;
+  accountId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 export const useTransactions = (overrides?: TransactionFilters) => {
   const queryClient = useQueryClient();
@@ -24,23 +27,38 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     page: 1,
     limit: 10,
     search: '',
+    accountId: '',
+    startDate: '',
+    endDate: '',
   });
 
   const activeFilters = overrides || internalFilters;
 
   // 2. EL QUERY (Obtener datos)
   const query = useQuery({
-    // La key debe incluir los filtros activos para que refresque si cambian
     queryKey: ['transactions', activeFilters],
     queryFn: async () => {
-      // Construimos la URL string con los filtros activos
-      const params = new URLSearchParams({
-        page: activeFilters.page?.toString() || '1',
-        limit: activeFilters.limit?.toString() || '10',
-        month: activeFilters.month?.toString() || '',
-        year: activeFilters.year?.toString() || '',
-        search: activeFilters.search || '',
-      });
+      // 👇 Lógica de params mejorada
+      const params = new URLSearchParams();
+
+      // Filtros básicos
+      params.append('page', (activeFilters.page || 1).toString());
+      params.append('limit', (activeFilters.limit || 10).toString());
+      if (activeFilters.search) params.append('search', activeFilters.search);
+      if (activeFilters.accountId)
+        params.append('accountId', activeFilters.accountId);
+
+      // Lógica de Fechas: Rango específico mata a Mes/Año
+      if (activeFilters.startDate && activeFilters.endDate) {
+        params.append('startDate', activeFilters.startDate);
+        params.append('endDate', activeFilters.endDate);
+      } else {
+        // Fallback a mes/año si no hay rango completo
+        if (activeFilters.month)
+          params.append('month', activeFilters.month.toString());
+        if (activeFilters.year)
+          params.append('year', activeFilters.year.toString());
+      }
 
       const { data } = await api.get<PaginatedResponse<Transaction>>(
         `/transactions?${params.toString()}`

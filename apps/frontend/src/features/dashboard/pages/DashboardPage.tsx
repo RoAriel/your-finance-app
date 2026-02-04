@@ -5,7 +5,7 @@ import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { TransactionsTable } from '../../transactions/components/TransactionsTable';
 import { CreateTransactionModal } from '../../transactions/components/CreateTransactionModal';
 import { StatsCards } from '../components/StatsCards';
-import { MonthSelector } from '../components/MonthSelector';
+import { MonthSelector } from '../../../components/common/MonthSelector';
 import { useDashboardReport } from '../hooks/useDashboardReport';
 import { ExpensesChart } from '../components/ExpensesChart';
 import { FinancialHealthWidget } from '../components/FinancialHealthWidget';

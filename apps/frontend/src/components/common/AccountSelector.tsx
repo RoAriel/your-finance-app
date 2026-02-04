@@ -9,6 +9,7 @@ interface Props {
   placeholder?: string;
   className?: string;
   error?: string;
+  allowEmpty?: boolean;
 }
 
 export const AccountSelector = ({
@@ -19,6 +20,7 @@ export const AccountSelector = ({
   placeholder = 'Selecciona una cuenta...',
   className = '',
   error,
+  allowEmpty = false,
 }: Props) => {
   // El hook ya se encarga de filtrar según el prop 'type'
   const { accounts, isLoading } = useAccounts({ type });
@@ -42,7 +44,7 @@ export const AccountSelector = ({
               error ? 'border-red-500' : 'border-gray-300'
             }`}
           >
-            <option value="" disabled>
+            <option value="" disabled={!allowEmpty}>
               {placeholder}
             </option>
             {accounts.length > 0 ? (

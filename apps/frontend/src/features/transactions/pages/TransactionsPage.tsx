@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 // Hooks y Componentes
 import { useTransactions } from '../hooks/useTransactions';
@@ -9,7 +9,8 @@ import { CreateTransactionModal } from '../components/CreateTransactionModal';
 import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
 import { SearchBar } from '../../../components/common/SearchBar'; // 👈 Tu buscador (Sprint 4 Parte 1)
 import { Pagination } from '../../../components/ui/Pagination'; // 👈 Tu paginación nueva
-
+import { AccountSelector } from '../../../components/common/AccountSelector'; // Ajusta la ruta si moviste el componente
+import { AccountType } from '../../accounts/types'; // Ajusta ruta
 import type { Transaction } from '../types';
 
 export const TransactionsPage = () => {
@@ -32,6 +33,8 @@ export const TransactionsPage = () => {
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     search: '',
+    startDate: '',
+    endDate: '',
   });
 
   // --- HOOK PRINCIPAL ---
@@ -51,19 +54,22 @@ export const TransactionsPage = () => {
 
   const handleSearch = (searchValue: string) => {
     setFilters((prev) => ({ ...prev, search: searchValue }));
-    setPage(1); // Importante: Al buscar, volvemos a la página 1
+    setPage(1);
+  };
+
+  const handleAccountChange = (accountId: string) => {
+    setFilters((prev) => ({ ...prev, accountId }));
+    setPage(1);
+  };
+
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setPage(1);
   };
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
-    // Opcional: Scroll al top de la tabla
-    // window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const clearAccountFilter = () => {
-    setFilters((prev) => ({ ...prev, accountId: '' }));
-    setSearchParams({});
-    setPage(1);
   };
 
   const handleEdit = (transaction: Transaction) => {
@@ -85,40 +91,68 @@ export const TransactionsPage = () => {
 
   return (
     <div className="p-6 space-y-6 h-full flex flex-col">
-      {/* Header & Filtros */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Movimientos</h1>
-
-          {/* Chip de Filtro Activo */}
-          {filters.accountId ? (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm text-gray-500">Filtrado por cuenta</span>
-              <button
-                onClick={clearAccountFilter}
-                className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full hover:bg-blue-200 transition-colors"
-              >
-                Cuenta Específica <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <p className="text-gray-500 text-sm">
-              Gestiona tus ingresos y gastos
-            </p>
-          )}
+          <p className="text-gray-500 text-sm">
+            Gestiona tus ingresos y gastos
+          </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          {/* 👇 1. INTEGRACIÓN DEL BUSCADOR */}
-          <SearchBar onSearch={handleSearch} placeholder="Buscar concepto..." />
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-colors"
+        >
+          <Plus size={20} />
+          <span className="hidden sm:inline">Nueva</span>
+        </button>
+      </div>
 
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-colors"
-          >
-            <Plus size={20} />
-            <span className="hidden sm:inline">Nueva</span>
-          </button>
+      {/* 🛠️ BARRA DE FILTROS */}
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+        {/* 1. Buscador (4 col) */}
+        <div className="md:col-span-4 w-full">
+          <SearchBar onSearch={handleSearch} placeholder="Buscar concepto..." />
+        </div>
+
+        {/* 2. Selector de Cuenta (3 col) */}
+        <div className="md:col-span-3 w-full">
+          <AccountSelector
+            value={filters.accountId}
+            onChange={handleAccountChange}
+            type={AccountType.WALLET}
+            label="Filtrar por Cuenta"
+            placeholder="Todas las cuentas"
+            allowEmpty={true} // 👈 MAGIA: Permite seleccionar "Todas"
+            className="w-full"
+          />
+        </div>
+
+        {/* 3. Rango de Fechas (5 col) */}
+        <div className="md:col-span-5 w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Rango de Fechas
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              name="startDate"
+              value={filters.startDate}
+              onChange={handleDateChange}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+              placeholder="Desde"
+            />
+            <span className="text-gray-400">-</span>
+            <input
+              type="date"
+              name="endDate"
+              value={filters.endDate}
+              onChange={handleDateChange}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none bg-white"
+              placeholder="Hasta"
+            />
+          </div>
         </div>
       </div>
 
@@ -139,7 +173,7 @@ export const TransactionsPage = () => {
               />
             </div>
 
-            {/* 👇 2. INTEGRACIÓN DE PAGINACIÓN */}
+            {/* Paginación */}
             {meta && (
               <Pagination
                 page={meta.page}
@@ -172,7 +206,7 @@ export const TransactionsPage = () => {
         onClose={() => setTransactionToDelete(null)}
         onConfirm={handleConfirmDelete}
         title="Eliminar movimiento"
-        message="¿Estás seguro de eliminar este movimiento? El saldo de la cuenta se recalculará."
+        message="¿Estás seguro? El saldo de la cuenta se recalculará."
       />
     </div>
   );
