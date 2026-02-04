@@ -1,5 +1,14 @@
-// 👇 1. IMPORTANTE: Traemos el Enum (La nueva fuente de verdad)
 import { CategoryType } from '../categories/types';
+
+export const TransactionType = {
+  INCOME: 'INCOME',
+  EXPENSE: 'EXPENSE',
+  TRANSFER_IN: 'transfer_in',
+  TRANSFER_OUT: 'transfer_out',
+} as const;
+
+export type TransactionType =
+  (typeof TransactionType)[keyof typeof TransactionType];
 
 // 1. Definimos la Categoría anidada
 export interface TransactionCategory {
@@ -8,20 +17,21 @@ export interface TransactionCategory {
   color: string;
   icon: string;
   isFixed: boolean;
+  type: CategoryType;
 }
 
 // 2. Definimos la Transacción
 export interface Transaction {
   id: string;
   userId: string;
-  type: CategoryType;
+  type: TransactionType;
 
   amount: string; // El backend manda string (Decimal de Prisma)
   currency: string;
   description: string;
   date: string; // ISO String
-  categoryId: string;
-  category?: TransactionCategory;
+  categoryId?: string | null;
+  category?: TransactionCategory | null;
   accountId: string;
   createdAt: string;
 }
@@ -56,7 +66,7 @@ export interface CreateTransactionDTO {
   categoryId: string;
   accountId: string;
   date: string;
-  type: CategoryType;
+  type: TransactionType;
   currency: string;
 }
 

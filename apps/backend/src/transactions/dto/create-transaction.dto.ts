@@ -11,11 +11,9 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum TransactionType {
-  INCOME = 'income', // Ingresos externos (Sueldo)
-  EXPENSE = 'expense', // Gastos reales (Comida)
-  BOTH = 'both', // (Para filtros)
-  TRANSFER_IN = 'transfer_in', // Recibir dinero de otra cuenta propia
-  TRANSFER_OUT = 'transfer_out', // Enviar dinero a otra cuenta propia
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER',
 }
 
 export class CreateTransactionDto {
@@ -24,7 +22,10 @@ export class CreateTransactionDto {
     enum: TransactionType,
     example: TransactionType.EXPENSE,
   })
-  @IsEnum(TransactionType, { message: 'Type must be either income or expense' })
+  // 2. Validación estricta con el nuevo Enum
+  @IsEnum(TransactionType, {
+    message: 'Type must be INCOME, EXPENSE or TRANSFER',
+  })
   type: TransactionType;
 
   @ApiProperty({

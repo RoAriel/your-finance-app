@@ -12,7 +12,6 @@ import {
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { QueryTransactionDto } from './dto/query-transaction.dto';
 import { AppLogger } from '../common/utils/logger.util';
-
 import {
   PaginatedResult,
   createPaginatedResponse,
@@ -25,7 +24,7 @@ export class TransactionsService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateTransactionDto, userId: string) {
-    const { accountId, amount, type, ...rest } = dto;
+    const { accountId, categoryId, amount, type, ...rest } = dto;
 
     this.logger.logOperation('Create transaction', {
       type,
@@ -44,6 +43,31 @@ export class TransactionsService {
       throw new NotFoundException(
         'Cuenta no encontrada o no pertenece al usuario',
       );
+    }
+
+    if (categoryId) {
+      const category = await this.prisma.category.findUnique({
+        where: { id: categoryId },
+      });
+
+      if (!category) throw new NotFoundException('Categoría no encontrada');
+
+      // Validar que la categoría sea del usuario
+      if (category.userId !== userId)
+        throw new BadRequestException('Categoría inválida');
+
+      // 🔴 VALIDACIÓN DE COHERENCIA 🔴
+      // Si la categoría es INCOME, la transacción debe ser INCOME.
+      // (Ignoramos si la categoría es BOTH, ahí permitimos cualquier cosa)
+
+      const catTypeStr = category.type;
+      const transTypeStr = type as string;
+
+      if (catTypeStr !== 'BOTH' && catTypeStr !== transTypeStr) {
+        throw new BadRequestException(
+          `No puedes crear una transacción de tipo ${type} con una categoría de tipo ${category.type}`,
+        );
+      }
     }
 
     try {
@@ -210,31 +234,46 @@ export class TransactionsService {
 
     if (!oldTransaction.accountId) {
       throw new BadRequestException(
-        'La transacción original no tiene una cuenta asociada válida.',
+        'La transacción original no tiene cuenta válida.',
       );
+    }
+
+    // 1. Validar Coherencia si cambian Categoría o Tipo
+    const targetCategoryId = dto.categoryId ?? oldTransaction.categoryId;
+    const targetType = dto.type ?? oldTransaction.type;
+
+    if (targetCategoryId) {
+      const category = await this.prisma.category.findUnique({
+        where: { id: targetCategoryId },
+      });
+      if (category) {
+        const catTypeStr = category.type;
+        const transTypeStr = targetType;
+
+        if (catTypeStr !== 'BOTH' && catTypeStr !== transTypeStr) {
+          throw new BadRequestException(
+            `Incoherencia: Categoría es ${catTypeStr} pero transacción es ${transTypeStr}`,
+          );
+        }
+      }
     }
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        // 1. REVERTIR el impacto anterior
-        const oldType = oldTransaction.type as TransactionType;
-        const reverseOp =
-          oldType === TransactionType.INCOME ? 'decrement' : 'increment';
+        // A. REVERTIR impacto anterior
+        // Usamos casting a string para evitar líos de Enums importados de lugares distintos
+        const oldTypeStr = oldTransaction.type;
+        const reverseOp = oldTypeStr === 'INCOME' ? 'decrement' : 'increment';
 
         await tx.account.update({
-          // 🛡️ CORRECCIÓN 1: Usamos "!" porque ya validamos arriba que accountId existe
           where: { id: oldTransaction.accountId! },
           data: { balance: { [reverseOp]: oldTransaction.amount } },
         });
 
-        // 2. APLICAR nueva transacción
+        // B. PREPARAR nuevos datos
         const newAmount =
           dto.amount !== undefined ? dto.amount : oldTransaction.amount;
-        const newType = dto.type
-          ? dto.type
-          : (oldTransaction.type as TransactionType);
-
-        // 🛡️ CORRECCIÓN 2: Usamos "!" porque si no viene en DTO, usamos el viejo (que ya sabemos que existe)
+        const newType = dto.type ? dto.type : oldTransaction.type;
         const newAccountId = dto.accountId || oldTransaction.accountId!;
 
         // Cambio de cuenta (si aplica)
@@ -246,21 +285,22 @@ export class TransactionsService {
             throw new NotFoundException('Nueva cuenta no encontrada');
         }
 
-        const applyOp =
-          newType === TransactionType.INCOME ? 'increment' : 'decrement';
+        // C. APLICAR nuevo impacto
+        const newTypeStr = newType;
+        const applyOp = newTypeStr === 'INCOME' ? 'increment' : 'decrement';
 
         await tx.account.update({
-          // 🛡️ CORRECCIÓN 3: newAccountId ahora es string seguro gracias a la corrección 2
           where: { id: newAccountId },
           data: { balance: { [applyOp]: newAmount } },
         });
 
-        // 3. Actualizar registro
+        // D. Actualizar registro
         return tx.transaction.update({
           where: { id },
           data: {
             ...dto,
-            accountId: dto.accountId,
+            accountId: newAccountId,
+            type: newType, // Prisma se encarga del Enum
           },
           include: { category: true },
         });
@@ -280,20 +320,17 @@ export class TransactionsService {
     const transaction = await this.findOne(id, userId);
 
     if (!transaction.accountId) {
-      throw new BadRequestException(
-        'La transacción no tiene una cuenta asociada para revertir el saldo.',
-      );
+      throw new BadRequestException('Transacción sin cuenta asociada.');
     }
 
     try {
       await this.prisma.$transaction(async (tx) => {
         // 1. Revertir saldo
-        const typeEnum = transaction.type as TransactionType;
-        const operation =
-          typeEnum === TransactionType.INCOME ? 'decrement' : 'increment';
+        // Si era INGRESO, al borrarlo RESTAMOS. Si era GASTO, al borrarlo SUMAMOS.
+        const typeStr = transaction.type;
+        const operation = typeStr === 'INCOME' ? 'decrement' : 'increment';
 
         await tx.account.update({
-          // 🛡️ CORRECCIÓN 4: Usamos "!" para asegurar que no es null
           where: { id: transaction.accountId! },
           data: {
             balance: { [operation]: transaction.amount },
@@ -308,9 +345,7 @@ export class TransactionsService {
       });
 
       this.logger.logSuccess('Delete transaction', { id });
-      return {
-        message: 'Transaction deleted and balance restored successfully',
-      };
+      return { message: 'Transacción eliminada y saldo restaurado.' };
     } catch (error) {
       this.logger.logFailure('Delete transaction', error as Error);
       throw error;
