@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, ArrowRightLeft } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query'; // 👈 Necesario para la transferencia
 import {
   useCreateTransaction,
   useUpdateTransaction,
 } from '../hooks/useTransactions';
+import { accountsService } from '../../accounts/services/accounts.service'; // 👈 Tu servicio nuevo
 import type { Transaction } from '../types';
-// 👇 1. Importamos el nuevo Enum de Transacciones
 import { TransactionType } from '../types';
 import { AccountType } from '../../accounts/types';
 import { CategoryType } from '../../categories/types';
@@ -23,18 +24,32 @@ export const CreateTransactionModal = ({
   onClose,
   transactionToEdit,
 }: Props) => {
+  const queryClient = useQueryClient();
   const createMutation = useCreateTransaction();
   const updateMutation = useUpdateTransaction();
+
+  // 👇 Mutación específica para Transferencias (hit al nuevo endpoint)
+  const transferMutation = useMutation({
+    mutationFn: accountsService.transfer,
+    onSuccess: () => {
+      // Invalidamos para refrescar listas y saldos
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      onClose();
+    },
+  });
+
   const isEditing = !!transactionToEdit;
-  const isLoading = createMutation.isPending || updateMutation.isPending;
+  // Si estamos transfiriendo, el loading viene de transferMutation
+  const isLoading =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    transferMutation.isPending;
 
   // --- ESTADOS ---
 
-  // 👇 2. El estado 'type' ahora usa TransactionType (la fuente de verdad del Backend)
   const [type, setType] = useState<TransactionType>(() => {
-    if (transactionToEdit?.type) {
-      return transactionToEdit.type;
-    }
+    if (transactionToEdit?.type) return transactionToEdit.type;
     return TransactionType.EXPENSE;
   });
 
@@ -50,9 +65,14 @@ export const CreateTransactionModal = ({
   const [categoryId, setCategoryId] = useState(
     transactionToEdit?.categoryId || ''
   );
+
+  // Cuenta Principal (Origen en Gasto/Transferencia, Destino en Ingreso)
   const [accountId, setAccountId] = useState(
     transactionToEdit?.accountId || ''
   );
+
+  // 👇 NUEVO: Cuenta Destino (Solo para Transferencias)
+  const [targetAccountId, setTargetAccountId] = useState('');
 
   const [date, setDate] = useState(() => {
     if (transactionToEdit?.date) {
@@ -61,44 +81,57 @@ export const CreateTransactionModal = ({
     return new Date().toISOString().split('T')[0];
   });
 
-  // --- HELPER: Puente entre TransactionType y CategoryType ---
-  // El selector necesita saber qué filtrar. Si es Gasto -> Categorías de Gasto.
+  // --- HELPERS ---
+
   const getCategoryFilter = (txType: TransactionType): CategoryType => {
     if (txType === TransactionType.INCOME) return CategoryType.INCOME;
-    // Por defecto devolvemos EXPENSE (cubre EXPENSE y TRANSFER si hiciera falta)
     return CategoryType.EXPENSE;
   };
 
-  // --- HANDLERS ---
-
   const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
-    setCategoryId(''); // Limpiamos categoría para evitar inconsistencias de tipo
+    setCategoryId('');
+    // Al cambiar de tipo, reseteamos la cuenta destino para evitar confusiones
+    if (newType !== TransactionType.TRANSFER) {
+      setTargetAccountId('');
+    }
   };
+
+  // --- SUBMIT ---
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validación: Si es Transferencia, la categoría es opcional (según tu lógica nueva)
-    // Si NO es transferencia, exigimos categoría.
     if (!amount || !description || !accountId) return;
-    if (type !== TransactionType.TRANSFER && !categoryId) return;
+
+    // 🔀 CAMINO A: Es una TRANSFERENCIA (Nuevo Endpoint)
+    if (type === TransactionType.TRANSFER) {
+      if (!targetAccountId) return; // Validación extra
+
+      transferMutation.mutate({
+        sourceAccountId: accountId,
+        targetAccountId: targetAccountId,
+        amount: parseFloat(amount),
+        description,
+        date: new Date(date).toISOString(),
+      });
+      return;
+    }
+
+    // 🔀 CAMINO B: Es GASTO o INGRESO (Endpoint Transacciones)
+    if (!categoryId) return; // Aquí sí exigimos categoría
 
     const transactionData = {
       amount: parseFloat(amount),
       description,
       date: new Date(date).toISOString(),
-      type: type, // 👇 Se envía el Enum correcto (INCOME, EXPENSE, TRANSFER)
-      categoryId: categoryId || undefined, // Puede ir vacío si es Transferencia
+      type: type,
+      categoryId,
       accountId,
       currency,
     };
 
-    const options = {
-      onSuccess: () => {
-        onClose();
-      },
-    };
+    const options = { onSuccess: () => onClose() };
 
     if (isEditing && transactionToEdit) {
       updateMutation.mutate(
@@ -129,7 +162,7 @@ export const CreateTransactionModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Tabs Tipo: Ahora usan TransactionType */}
+          {/* Tabs Tipo */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
@@ -153,7 +186,6 @@ export const CreateTransactionModal = ({
             >
               Ingreso
             </button>
-            {/* Botón de Transferencia (Opcional, habilítalo si ya quieres usarlas) */}
             <button
               type="button"
               onClick={() => handleTypeChange(TransactionType.TRANSFER)}
@@ -167,18 +199,45 @@ export const CreateTransactionModal = ({
             </button>
           </div>
 
-          {/* Selector de Cuenta */}
-          <AccountSelector
-            value={accountId}
-            onChange={setAccountId}
-            type={AccountType.WALLET}
-            label={
-              type === TransactionType.INCOME
-                ? 'Destino (Cuenta)'
-                : 'Origen (Cuenta)'
-            }
-            placeholder="Selecciona la cuenta..."
-          />
+          {/* LÓGICA DE CUENTAS: 
+              Si es Transferencia -> Muestra Origen Y Destino.
+              Si no -> Muestra solo una cuenta con label dinámico.
+          */}
+          {type === TransactionType.TRANSFER ? (
+            <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-100 relative">
+              {/* Decoración visual de transferencia */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-1 rounded-full shadow-sm border border-gray-100 z-10 hidden sm:block">
+                <ArrowRightLeft size={14} className="text-gray-400" />
+              </div>
+
+              <AccountSelector
+                value={accountId}
+                onChange={setAccountId}
+                type={AccountType.WALLET}
+                label="Desde (Origen)"
+                placeholder="Cuenta origen..."
+              />
+              <AccountSelector
+                value={targetAccountId}
+                onChange={setTargetAccountId}
+                type={AccountType.WALLET}
+                label="Hacia (Destino)"
+                placeholder="Cuenta destino..."
+              />
+            </div>
+          ) : (
+            <AccountSelector
+              value={accountId}
+              onChange={setAccountId}
+              type={AccountType.WALLET}
+              label={
+                type === TransactionType.INCOME
+                  ? 'Destino (Cuenta)'
+                  : 'Origen (Cuenta)'
+              }
+              placeholder="Selecciona la cuenta..."
+            />
+          )}
 
           {/* Monto y Moneda */}
           <div className="grid grid-cols-3 gap-4">
@@ -222,7 +281,6 @@ export const CreateTransactionModal = ({
               <CategorySelector
                 value={categoryId}
                 onChange={setCategoryId}
-                // 👇 MAGIA: Convertimos TransactionType -> CategoryType para el filtro
                 type={getCategoryFilter(type)}
                 placeholder="Selecciona una categoría..."
               />
@@ -261,19 +319,23 @@ export const CreateTransactionModal = ({
           <div className="pt-2">
             <button
               type="submit"
-              // Validamos categoryId solo si NO es transferencia
+              // Validación condicional: Si es Transf, requerimos Target. Si no, requerimos Category.
               disabled={
                 isLoading ||
                 !accountId ||
-                (type !== TransactionType.TRANSFER && !categoryId)
+                (type === TransactionType.TRANSFER
+                  ? !targetAccountId
+                  : !categoryId)
               }
               className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {isLoading
-                ? 'Guardando...'
+                ? 'Procesando...'
                 : isEditing
                   ? 'Guardar Cambios'
-                  : 'Crear Transacción'}
+                  : type === TransactionType.TRANSFER
+                    ? 'Transferir Fondos'
+                    : 'Crear Transacción'}
             </button>
           </div>
         </form>
