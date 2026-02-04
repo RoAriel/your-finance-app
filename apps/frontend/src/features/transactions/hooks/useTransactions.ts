@@ -82,7 +82,8 @@ export const useTransactions = (overrides?: TransactionFilters) => {
   return {
     // Propiedades del Query (data, isLoading, error, etc.)
     ...query,
-
+    transactions: query.data?.data || [],
+    meta: query.data?.meta,
     // Funciones de Mutación
     createTransaction: createMutation.mutateAsync,
     updateTransaction: updateMutation.mutateAsync,
