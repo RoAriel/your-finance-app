@@ -118,6 +118,8 @@ export class BudgetsService {
             id: budget.id,
             categoryId: budget.categoryId,
             categoryName: budget.category.name,
+            categoryIcon: budget.category.icon,
+            categoryColor: budget.category.color,
             month: budget.month,
             year: budget.year,
             amount: limit, // Frontend espera 'amount' (o 'limit', según tu interfaz, ajústalo si es necesario)

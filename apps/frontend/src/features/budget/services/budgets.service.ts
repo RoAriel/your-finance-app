@@ -5,6 +5,8 @@ export interface Budget {
   id: string;
   categoryId: string;
   categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
   month: number;
   year: number;
   amount: number;
