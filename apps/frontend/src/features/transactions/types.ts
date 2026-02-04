@@ -3,8 +3,7 @@ import { CategoryType } from '../categories/types';
 export const TransactionType = {
   INCOME: 'INCOME',
   EXPENSE: 'EXPENSE',
-  TRANSFER_IN: 'transfer_in',
-  TRANSFER_OUT: 'transfer_out',
+  TRANSFER: 'TRANSFER',
 } as const;
 
 export type TransactionType =
@@ -63,7 +62,7 @@ export interface BalanceResponse {
 export interface CreateTransactionDTO {
   amount: number; // Aquí el form usa number
   description: string;
-  categoryId: string;
+  categoryId?: string;
   accountId: string;
   date: string;
   type: TransactionType;

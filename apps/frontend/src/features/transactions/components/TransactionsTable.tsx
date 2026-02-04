@@ -1,11 +1,9 @@
-import { Edit2, Trash2, Lock, HelpCircle } from 'lucide-react';
+import { Edit2, Trash2, Lock, HelpCircle, ArrowRightLeft } from 'lucide-react';
 import type { Transaction } from '../types';
 import { formatDate } from '../../../utils/formatters';
 import { useCurrency } from '../../../hooks/useCurrency';
 import { ICON_MAP } from '../../categories/constants';
-// 👇 1. Importamos el Enum para comparar correctamente
-import { CategoryType } from '../../categories/types';
-
+import { TransactionType } from '../types';
 interface Props {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
@@ -52,13 +50,9 @@ export const TransactionsTable = ({
         <tbody className="divide-y divide-gray-100">
           {transactions.map((tx) => {
             // 👇 2. CORRECCIÓN: Usamos el Enum en lugar de strings 'magic'
-            const isExpense = tx.type === CategoryType.EXPENSE;
-            const isIncome = tx.type === CategoryType.INCOME;
-
-            // Si tu Enum tuviera TRANSFER, usaríamos CategoryType.TRANSFER
-            // Por ahora, asumimos que si no es ninguno de los dos, podría ser transferencia interna
-            // Ojo: Esto depende de si agregaste TRANSFER a tu Enum en steps anteriores.
-            //const isTransfer = !isExpense && !isIncome && tx.type === 'TRANSFER';
+            const isExpense = tx.type === TransactionType.EXPENSE;
+            const isIncome = tx.type === TransactionType.INCOME;
+            const isTransfer = tx.type === TransactionType.TRANSFER;
 
             // Lógica de colores y signos
             let amountColor = 'text-gray-600';
@@ -71,14 +65,19 @@ export const TransactionsTable = ({
               amountColor = 'text-green-600';
               amountSign = '+';
             } else {
+              // Transferencias
               amountColor = 'text-blue-600';
               amountSign = '';
             }
 
             // Resolución del Icono Visual
-            const iconKey = tx.category?.icon || 'HelpCircle';
-            const IconComp = ICON_MAP[iconKey] || HelpCircle;
-            const categoryColor = tx.category?.color || '#cbd5e1';
+            const iconKey =
+              tx.category?.icon ||
+              (isTransfer ? 'ArrowRightLeft' : 'HelpCircle');
+            const IconComp =
+              ICON_MAP[iconKey] || (isTransfer ? ArrowRightLeft : HelpCircle);
+            const categoryColor =
+              tx.category?.color || (isTransfer ? '#3b82f6' : '#cbd5e1');
 
             return (
               <tr
@@ -126,7 +125,8 @@ export const TransactionsTable = ({
 
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm text-gray-700">
-                        {tx.category?.name || 'Sin categoría'}
+                        {tx.category?.name ||
+                          (isTransfer ? 'Transferencia' : 'Sin categoría')}
                       </span>
                       {tx.category?.isFixed && (
                         <Lock size={12} className="text-gray-400" />

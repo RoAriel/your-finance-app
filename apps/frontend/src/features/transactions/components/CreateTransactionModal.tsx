@@ -1,14 +1,16 @@
-import { useState } from 'react'; // 👈 Adiós useEffect
+import { useState } from 'react';
 import { X } from 'lucide-react';
-import type { Transaction } from '../types';
-import { AccountType } from '../../accounts/types';
-import { CategoryType } from '../../categories/types';
-import { CategorySelector } from '../../../components/common/CategorySelector';
-import { AccountSelector } from '../../../components/common/AccountSelector';
 import {
   useCreateTransaction,
   useUpdateTransaction,
 } from '../hooks/useTransactions';
+import type { Transaction } from '../types';
+// 👇 1. Importamos el nuevo Enum de Transacciones
+import { TransactionType } from '../types';
+import { AccountType } from '../../accounts/types';
+import { CategoryType } from '../../categories/types';
+import { CategorySelector } from '../../../components/common/CategorySelector';
+import { AccountSelector } from '../../../components/common/AccountSelector';
 
 interface Props {
   isOpen: boolean;
@@ -26,15 +28,14 @@ export const CreateTransactionModal = ({
   const isEditing = !!transactionToEdit;
   const isLoading = createMutation.isPending || updateMutation.isPending;
 
-  // --- ESTADOS (Inicialización Directa) ---
-  // Al usar renderizado condicional en el padre, estos se reinician solos al abrirse.
+  // --- ESTADOS ---
 
-  const [type, setType] = useState<CategoryType>(() => {
-    // Lógica segura para determinar el tipo inicial
-    if (transactionToEdit?.type === CategoryType.INCOME) {
-      return CategoryType.INCOME;
+  // 👇 2. El estado 'type' ahora usa TransactionType (la fuente de verdad del Backend)
+  const [type, setType] = useState<TransactionType>(() => {
+    if (transactionToEdit?.type) {
+      return transactionToEdit.type;
     }
-    return CategoryType.EXPENSE;
+    return TransactionType.EXPENSE;
   });
 
   const [amount, setAmount] = useState(
@@ -53,7 +54,6 @@ export const CreateTransactionModal = ({
     transactionToEdit?.accountId || ''
   );
 
-  // Fecha
   const [date, setDate] = useState(() => {
     if (transactionToEdit?.date) {
       return new Date(transactionToEdit.date).toISOString().split('T')[0];
@@ -61,28 +61,35 @@ export const CreateTransactionModal = ({
     return new Date().toISOString().split('T')[0];
   });
 
-  // ❌ BORRADO: useEffect eliminado.
+  // --- HELPER: Puente entre TransactionType y CategoryType ---
+  // El selector necesita saber qué filtrar. Si es Gasto -> Categorías de Gasto.
+  const getCategoryFilter = (txType: TransactionType): CategoryType => {
+    if (txType === TransactionType.INCOME) return CategoryType.INCOME;
+    // Por defecto devolvemos EXPENSE (cubre EXPENSE y TRANSFER si hiciera falta)
+    return CategoryType.EXPENSE;
+  };
 
   // --- HANDLERS ---
 
-  const handleTypeChange = (newType: CategoryType) => {
+  const handleTypeChange = (newType: TransactionType) => {
     setType(newType);
-    // Solo limpiamos la categoría si cambiamos de tipo (Gasto <-> Ingreso)
-    // porque las categorías de uno no sirven para el otro.
-    setCategoryId('');
+    setCategoryId(''); // Limpiamos categoría para evitar inconsistencias de tipo
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!amount || !categoryId || !description || !accountId) return;
+    // Validación: Si es Transferencia, la categoría es opcional (según tu lógica nueva)
+    // Si NO es transferencia, exigimos categoría.
+    if (!amount || !description || !accountId) return;
+    if (type !== TransactionType.TRANSFER && !categoryId) return;
 
     const transactionData = {
       amount: parseFloat(amount),
       description,
       date: new Date(date).toISOString(),
-      type: type,
-      categoryId,
+      type: type, // 👇 Se envía el Enum correcto (INCOME, EXPENSE, TRANSFER)
+      categoryId: categoryId || undefined, // Puede ir vacío si es Transferencia
       accountId,
       currency,
     };
@@ -122,13 +129,13 @@ export const CreateTransactionModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Tabs Tipo */}
+          {/* Tabs Tipo: Ahora usan TransactionType */}
           <div className="flex bg-gray-100 p-1 rounded-lg">
             <button
               type="button"
-              onClick={() => handleTypeChange(CategoryType.EXPENSE)}
+              onClick={() => handleTypeChange(TransactionType.EXPENSE)}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === CategoryType.EXPENSE
+                type === TransactionType.EXPENSE
                   ? 'bg-white text-red-600 shadow-sm'
                   : 'text-gray-500'
               }`}
@@ -137,14 +144,26 @@ export const CreateTransactionModal = ({
             </button>
             <button
               type="button"
-              onClick={() => handleTypeChange(CategoryType.INCOME)}
+              onClick={() => handleTypeChange(TransactionType.INCOME)}
               className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
-                type === CategoryType.INCOME
+                type === TransactionType.INCOME
                   ? 'bg-white text-green-600 shadow-sm'
                   : 'text-gray-500'
               }`}
             >
               Ingreso
+            </button>
+            {/* Botón de Transferencia (Opcional, habilítalo si ya quieres usarlas) */}
+            <button
+              type="button"
+              onClick={() => handleTypeChange(TransactionType.TRANSFER)}
+              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-all ${
+                type === TransactionType.TRANSFER
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-500'
+              }`}
+            >
+              Transf.
             </button>
           </div>
 
@@ -154,7 +173,7 @@ export const CreateTransactionModal = ({
             onChange={setAccountId}
             type={AccountType.WALLET}
             label={
-              type === CategoryType.INCOME
+              type === TransactionType.INCOME
                 ? 'Destino (Cuenta)'
                 : 'Origen (Cuenta)'
             }
@@ -194,18 +213,21 @@ export const CreateTransactionModal = ({
             </div>
           </div>
 
-          {/* Categoría */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría
-            </label>
-            <CategorySelector
-              value={categoryId}
-              onChange={setCategoryId}
-              type={type}
-              placeholder="Selecciona una categoría..."
-            />
-          </div>
+          {/* Categoría: Oculta si es Transferencia */}
+          {type !== TransactionType.TRANSFER && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Categoría
+              </label>
+              <CategorySelector
+                value={categoryId}
+                onChange={setCategoryId}
+                // 👇 MAGIA: Convertimos TransactionType -> CategoryType para el filtro
+                type={getCategoryFilter(type)}
+                placeholder="Selecciona una categoría..."
+              />
+            </div>
+          )}
 
           {/* Descripción */}
           <div>
@@ -239,7 +261,12 @@ export const CreateTransactionModal = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isLoading || !accountId}
+              // Validamos categoryId solo si NO es transferencia
+              disabled={
+                isLoading ||
+                !accountId ||
+                (type !== TransactionType.TRANSFER && !categoryId)
+              }
               className="w-full py-2.5 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover disabled:opacity-50 transition-colors shadow-sm"
             >
               {isLoading

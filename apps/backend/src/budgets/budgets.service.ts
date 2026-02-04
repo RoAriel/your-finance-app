@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { AppLogger } from '../common/utils/logger.util';
-//import { TransactionType } from '../transactions/dto/create-transaction.dto';
+import { TransactionType } from '../transactions/dto/create-transaction.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 import { Prisma } from '@prisma/client';
 
@@ -88,11 +88,7 @@ export class BudgetsService {
             where: {
               userId,
               categoryId: budget.categoryId,
-
-              // --- CORRECCIÓN CRÍTICA ---
-              // Usamos 'expense' en minúscula tal como confirmaste que está en tu DB
-              type: 'expense',
-
+              type: TransactionType.EXPENSE,
               date: {
                 gte: startDate, // Mayor o igual al inicio
                 lt: nextMonthDate, // Menor estricto al inicio del siguiente mes

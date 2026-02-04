@@ -170,7 +170,7 @@ export class AccountsService {
             amount: amount,
             description: `Transferencia a: ${targetAccount.name}`,
             date: new Date(),
-            type: TransactionType.TRANSFER_OUT,
+            type: TransactionType.TRANSFER,
             userId,
             accountId: sourceAccountId, // 👈 CAMBIO: accountId
             currency: sourceAccount.currency,
@@ -191,7 +191,7 @@ export class AccountsService {
               ? `Recibido: ${description}`
               : `Desde: ${sourceAccount.name}`,
             date: new Date(),
-            type: TransactionType.TRANSFER_IN,
+            type: TransactionType.INCOME,
             userId,
             accountId: targetAccountId, // 👈 CAMBIO: accountId
             currency: targetAccount.currency,
