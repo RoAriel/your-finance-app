@@ -18,10 +18,10 @@ export const authService = {
 
   // 👇 NUEVO MÉTODO CON LOGGERS
   register: async (dto: RegisterDto): Promise<AuthResponse> => {
-    // 1. Log de entrada (Debug)
-    logger.debug('Iniciando registro de nuevo usuario', {
+    logger.debug('Iniciando registro', {
       email: dto.email,
-      currency: dto.currency || 'ARS',
+      firstName: dto.firstName, // 👈 Logueamos datos útiles
+      currency: dto.currency,
     });
 
     // 2. Llamada a la API

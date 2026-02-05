@@ -1,13 +1,13 @@
 // apps/frontend/src/features/auth/types.ts
 
 export interface User {
-  email: string;
-  name: string;
-  currency: string;
   id: string;
-  firstName: string;
-  lastName: string;
+  email: string;
+  firstName: string; // 👈 Reemplaza a 'name'
+  lastName: string; // 👈 Nuevo
+  currency: string;
   avatarUrl?: string;
+  // timezone, language, role, etc. pueden agregarse aquí
 }
 
 export interface AuthResponse {
@@ -21,7 +21,6 @@ export interface LoginCredentials {
 }
 
 export interface RegisterDto {
-  name: string;
   email: string;
   password: string;
   firstName: string;

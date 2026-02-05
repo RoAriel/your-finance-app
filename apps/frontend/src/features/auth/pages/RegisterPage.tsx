@@ -3,7 +3,7 @@ import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { User, Mail, Lock, Wallet, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast'; // Opcional, para éxito
+import toast from 'react-hot-toast';
 
 const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'];
 
@@ -11,12 +11,13 @@ export const RegisterPage = () => {
   const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Estados del formulario
+  // 👇 Estado actualizado: firstName + lastName
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
-    currency: 'ARS', // Default sugerido
+    currency: 'ARS',
   });
 
   const handleChange = (
@@ -30,39 +31,34 @@ export const RegisterPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.email || !formData.password || !formData.name) return;
+    // Validación básica actualizada
+    if (
+      !formData.email ||
+      !formData.password ||
+      !formData.firstName ||
+      !formData.lastName
+    )
+      return;
 
     try {
       setIsLoading(true);
-
-      // Llamamos al servicio
       await register(formData);
-
-      // Feedback de éxito
-      toast.success(`¡Bienvenido ${formData.name}! Tu billetera está lista.`);
-
-      // Redirección (Usualmente al login o directo al dashboard si el back devuelve token)
+      toast.success(
+        `¡Bienvenido ${formData.firstName}! Tu billetera está lista.`
+      );
     } catch (error) {
-      // Valor por defecto
       let errorMessage = 'Ocurrió un error inesperado al registrarse';
 
-      // 1. Chequeo: ¿Es un error de respuesta HTTP (Axios)?
       if (isAxiosError(error)) {
-        // Aquí TS ya sabe que 'error' tiene la propiedad 'response'
         const data = error.response?.data as { message?: string | string[] };
-
         if (data?.message) {
-          // Manejamos si el backend devuelve un string o un array de errores
           errorMessage = Array.isArray(data.message)
             ? data.message.join(', ')
             : data.message;
         }
-      }
-      // 2. Chequeo: ¿Es un error genérico de JS (ej: fallo de red sin respuesta)?
-      else if (error instanceof Error) {
+      } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
@@ -72,7 +68,7 @@ export const RegisterPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Header Visual */}
+        {/* Header */}
         <div className="bg-primary p-8 text-center">
           <div className="mx-auto w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm">
             <Wallet className="text-white" size={24} />
@@ -86,24 +82,49 @@ export const RegisterPage = () => {
         {/* Formulario */}
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Nombre */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre Completo
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <User size={18} />
-                </span>
-                <input
-                  name="name"
-                  type="text"
-                  placeholder="Juan Pérez"
-                  required
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-                />
+            {/* 👇 NUEVO LAYOUT: Grid para Nombre y Apellido */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Nombre */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nombre
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <User size={18} />
+                  </span>
+                  <input
+                    name="firstName"
+                    type="text"
+                    placeholder="Juan"
+                    required
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Apellido */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Apellido
+                </label>
+                <div className="relative">
+                  {/* Icono fantasma para mantener alineación o sin icono */}
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <User size={18} />
+                  </span>
+                  <input
+                    name="lastName"
+                    type="text"
+                    placeholder="Pérez"
+                    required
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -123,7 +144,7 @@ export const RegisterPage = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
             </div>
@@ -145,40 +166,30 @@ export const RegisterPage = () => {
                   minLength={8}
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1 ml-1">
-                Mínimo 8 caracteres
-              </p>
             </div>
 
-            {/* Selector de Moneda Principal */}
+            {/* Moneda */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Moneda Principal
               </label>
-              <div className="relative">
-                {/* Un pequeño truco visual para el select */}
-                <select
-                  name="currency"
-                  value={formData.currency}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none bg-white cursor-pointer"
-                >
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-gray-400 mt-1 ml-1">
-                Se creará tu billetera en esta moneda.
-              </p>
+              <select
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white cursor-pointer"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Botón Submit */}
             <button
               type="submit"
               disabled={isLoading}
@@ -194,7 +205,6 @@ export const RegisterPage = () => {
             </button>
           </form>
 
-          {/* Footer Login */}
           <div className="mt-6 text-center text-sm text-gray-500">
             ¿Ya tienes una cuenta?{' '}
             <Link

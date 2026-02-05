@@ -1,12 +1,26 @@
-import { IsString, IsOptional, IsInt, Min, Max, Length } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  Length,
+  MinLength,
+} from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateUserDto {
-  @ApiPropertyOptional({ description: 'Nombre del usuario' })
+  @ApiPropertyOptional({ description: 'Nuevo nombre de pila' })
   @IsOptional()
   @IsString()
-  @Length(2, 50)
-  name?: string;
+  @MinLength(2)
+  firstName?: string; // 👈 ¡Esto es lo que falta!
+
+  @ApiPropertyOptional({ description: 'Nuevo apellido' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  lastName?: string; // 👈 ¡Y esto!
 
   @ApiPropertyOptional({ description: 'Moneda preferida (ej: ARS, USD)' })
   @IsOptional()
