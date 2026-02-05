@@ -5,6 +5,9 @@ export interface User {
   name: string;
   currency: string;
   id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl?: string;
 }
 
 export interface AuthResponse {
@@ -21,5 +24,7 @@ export interface RegisterDto {
   name: string;
   email: string;
   password: string;
+  firstName: string;
+  lastName: string;
   currency?: string;
 }

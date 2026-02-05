@@ -1,23 +1,35 @@
-import { IsString, IsEmail, MinLength, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
+import { Role } from '@prisma/client'; // Asegúrate de tener esto generado
 
 export class CreateUserDto {
-  @ApiProperty({ description: 'Email único del usuario' })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'Nombre completo' })
   @IsString()
-  @MinLength(2)
-  name: string;
-
-  @ApiProperty({ description: 'Contraseña (se hasheará en el servicio)' })
-  @IsString()
-  @MinLength(6)
+  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
   password: string;
 
-  @ApiPropertyOptional({ description: 'Moneda por defecto', default: 'ARS' })
+  // ✨ CAMBIO CRÍTICO: Reemplazamos 'name' por estos dos
+  @IsString()
+  @MinLength(2)
+  firstName: string;
+
+  @IsString()
+  @MinLength(2)
+  lastName: string;
+
+  // Opcionales
   @IsOptional()
   @IsString()
-  currency?: string;
+  currency?: string = 'ARS';
+
+  @IsOptional()
+  @IsEnum(Role)
+  role?: Role = Role.USER;
 }

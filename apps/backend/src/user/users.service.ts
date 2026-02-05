@@ -9,16 +9,23 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    const { password, ...userData } = createUserDto;
+    // 1. Extraemos password (para hashear) y currency (para default)
+    // 'userData' ahora SOLO tiene email, firstName, lastName, role, etc.
+    const { password, currency, ...userData } = createUserDto;
 
-    // Hasheamos la password aquí para asegurar que NUNCA se guarde texto plano
-    // incluso si el usuario se crea desde el panel de Admin
     const hashedPassword = await bcrypt.hash(password, 10);
 
     return this.prisma.user.create({
       data: {
+        // 2. Esparcimos los datos limpios (email, names, etc.)
         ...userData,
+
+        // 3. Asignamos los valores procesados
         password: hashedPassword,
+        currency: currency || 'ARS',
+
+        // Sugerencia: Como es creación manual, fuerza el provider
+        authProvider: 'LOCAL',
       },
     });
   }

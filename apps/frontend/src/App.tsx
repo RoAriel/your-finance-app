@@ -10,6 +10,7 @@ import { BudgetsPage } from './features/budget/pages/BudgetsPage';
 import { SavingsPage } from './features/accounts/pages/SavingsPage';
 import { RegisterPage } from './features/auth/pages/RegisterPage';
 import { MainLayout } from './layouts/MainLayout';
+import { ProfilePage } from './features/users/pages/ProfilePage';
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
                 <Route path="/transactions" element={<TransactionsPage />} />
                 <Route path="/budgets" element={<BudgetsPage />} />
                 <Route path="/savings" element={<SavingsPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
               </Route>
             </Route>
 

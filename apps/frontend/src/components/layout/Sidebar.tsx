@@ -8,6 +8,7 @@ import {
   HandCoins,
   ChevronLeft,
   ChevronRight,
+  User as UserIcon,
   //Menu,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/hooks/useAuth';
@@ -18,7 +19,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const navLinks = [
     {
@@ -30,6 +31,7 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
     { to: '/savings', text: 'Mis Cuentas', icon: <HandCoins size={22} /> }, // Subido por prioridad
     { to: '/budgets', text: 'Presupuestos', icon: <Wallet size={22} /> },
     { to: '/categories', text: 'Categorías', icon: <Tags size={22} /> },
+    { to: '/profile', text: 'Mi Perfil', icon: <UserIcon size={22} /> },
   ];
 
   return (
@@ -100,7 +102,22 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
       </nav>
 
       {/* 3. FOOTER */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-slate-800 space-y-4">
+        {!isCollapsed && user && (
+          <div className="flex items-center gap-3 px-2 mb-2">
+            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs border border-primary/30">
+              {/* Iniciales */}
+              {user.firstName?.[0]}
+              {user.lastName?.[0]}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-medium text-white truncate">
+                {user.firstName} {user.lastName}
+              </p>
+              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+            </div>
+          </div>
+        )}
         <button
           onClick={logout}
           className={`

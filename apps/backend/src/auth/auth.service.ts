@@ -20,7 +20,7 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const { email, password, name, currency = 'ARS' } = dto;
+    const { email, password, firstName, lastName, currency = 'ARS' } = dto;
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -40,7 +40,8 @@ export class AuthService {
           data: {
             email,
             password: hashedPassword,
-            name,
+            firstName,
+            lastName,
             currency,
             fiscalStartDay: 1,
           },
@@ -104,7 +105,8 @@ export class AuthService {
       user: {
         id: newUser.id,
         email: newUser.email,
-        name: newUser.name,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
         currency: newUser.currency,
       },
       token,
@@ -116,7 +118,9 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    if (!user) {
+    // ✨ Validación extra: Si el usuario existe pero no tiene password
+    // (ej: se creó con Google), no podemos hacer login local.
+    if (!user || !user.password) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -132,7 +136,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
       },
       token,
     };

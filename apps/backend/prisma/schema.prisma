@@ -37,35 +37,66 @@ enum TransactionType {
   TRANSFER 
 }
 
-// ===========================================
-// USER MODEL
-// ===========================================
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  MICROSOFT
+  APPLE
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
+  id       String @id @default(uuid())
   
-  // Preferencias
+  // --- IDENTIDAD ---
+  email    String  @unique
+  // ⚠️ Ahora es opcional: Si entra con Google, esto será null.
+  password String? 
+  
+  // ✨ Separado para mejor formalidad
+  firstName String @map("first_name")
+  lastName  String @map("last_name")
+  
+  avatarUrl String? // Foto de perfil (o la que viene de Google)
+  phone     String? 
+
+  // --- SOCIAL LOGIN PREP ---
+  authProvider   AuthProvider @default(LOCAL) @map("auth_provider")
+  authProviderId String?      @map("auth_provider_id") // ID único de Google/Microsoft
+
+  // --- PREFERENCIAS ---
   currency       String @default("ARS")
   fiscalStartDay Int    @default(1)
+  timezone       String @default("America/Argentina/Buenos_Aires") // Clave para reportes
+  language       String @default("es") 
+
+  // --- SEGURIDAD ---
+  role          Role      @default(USER)
+  isActive      Boolean   @default(true)
+  lastLogin     DateTime?
   
-  // Seguridad & Negocio
-  role           Role             @default(USER)
-  subscription   SubscriptionTier @default(FREE)
-  isActive       Boolean          @default(true)
-  lastLogin      DateTime?
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Recuperación y Verificación
+  resetToken       String?   @unique 
+  resetTokenExpiry DateTime? 
+  emailVerified    DateTime? // Fecha de verificación (null = no verificado)
+
+  // --- NEGOCIO (SaaS) ---
+  subscription     SubscriptionTier @default(FREE)
+  externalCustomerId String? // Stripe/MercadoPago Customer ID
+
+  // --- TIMESTAMPS ---
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
-  
-  // Relaciones
+
+  // --- RELACIONES ---
   transactions Transaction[]
   categories   Category[]
-  accounts     Account[]      // 👈 Renombramos la relación (antes savingsAccounts)
+  accounts     Account[]
   budgets      Budget[]
-  
+
+  // Índices para búsquedas rápidas
+  @@index([email])
+  @@index([authProviderId]) // Rápido login con Google
   @@map("users")
 }
 
