@@ -9,8 +9,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { AccountType } from '@prisma/client';
+import { AuthProvider, AccountType } from '@prisma/client';
 import { DEFAULT_CATEGORIES_HIERARCHY } from '../common/constants/default-categories';
+import { GoogleUser } from './interfaces/google-user.interface';
 
 @Injectable()
 export class AuthService {
@@ -143,8 +144,95 @@ export class AuthService {
     };
   }
 
-  private generateToken(userId: string, email: string): string {
+  generateToken(userId: string, email: string): string {
     const payload: JwtPayload = { sub: userId, email };
     return this.jwtService.sign(payload);
+  }
+
+  async validateGoogleUser(googleUser: GoogleUser) {
+    const { email, firstName, lastName, googleId, picture } = googleUser;
+
+    // 1. Buscamos si ya existe el usuario
+    let user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (user) {
+      // ✅ CASO: Usuario Existe -> Lo vinculamos actualizando su ID de Google y Avatar
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          authProvider:
+            user.authProvider === 'LOCAL' ? 'GOOGLE' : user.authProvider, // Opcional: Cambiar provider
+          authProviderId: googleId, // Guardamos el ID de Google para futuro
+          avatarUrl: picture, // Actualizamos foto
+        },
+      });
+    } else {
+      // ✨ CASO: Usuario Nuevo -> Lo creamos con todo el setup (Billetera + Categorías)
+      user = await this.prisma.$transaction(async (tx) => {
+        // A. Crear User
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            firstName,
+            lastName,
+            authProvider: AuthProvider.GOOGLE,
+            authProviderId: googleId,
+            avatarUrl: picture,
+            password: null, // Sin password
+            currency: 'ARS', // Default
+            fiscalStartDay: 1,
+          },
+        });
+
+        // B. Crear Billetera Default
+        await tx.account.create({
+          data: {
+            name: 'Efectivo / Billetera',
+            userId: newUser.id,
+            type: AccountType.WALLET,
+            currency: 'ARS',
+            icon: 'wallet',
+            color: '#10B981',
+            balance: 0,
+            isDefault: true,
+          },
+        });
+
+        // C. Crear Categorías (Copiado de tu register logic)
+        for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
+          const parent = await tx.category.create({
+            data: {
+              name: catData.name,
+              type: catData.type,
+              color: catData.color,
+              icon: catData.icon,
+              isFixed: catData.isFixed,
+              userId: newUser.id,
+            },
+          });
+
+          if (catData.children && catData.children.length > 0) {
+            await tx.category.createMany({
+              data: catData.children.map((child) => ({
+                name: child.name,
+                type: child.type,
+                color: child.color,
+                icon: child.icon,
+                isFixed: child.isFixed,
+                parentId: parent.id,
+                userId: newUser.id,
+              })),
+            });
+          }
+        }
+
+        return newUser;
+      });
+    }
+
+    // Retornamos el usuario (passport lo inyectará en req.user)
+    return user;
   }
 }

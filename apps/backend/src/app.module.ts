@@ -11,6 +11,7 @@ import { ReportsModule } from './reports/reports.module';
 import { UsersModule } from './user/users.module';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { LoggerMiddleware } from './logger.middleware';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -22,6 +23,9 @@ import { LoggerMiddleware } from './logger.middleware';
     BudgetsModule,
     ReportsModule,
     UsersModule,
+    ConfigModule.forRoot({
+      isGlobal: true, // Esto hace que no tengas que importarlo en cada módulo hijo
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],
