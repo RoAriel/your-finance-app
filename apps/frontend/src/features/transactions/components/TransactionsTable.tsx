@@ -1,7 +1,7 @@
 import { Edit2, Trash2, Lock, HelpCircle, ArrowRightLeft } from 'lucide-react';
 import type { Transaction } from '../types';
-import { formatDate } from '../../../utils/formatters';
-import { useCurrency } from '../../../hooks/useCurrency';
+import { formatDate } from '@/utils/formatters';
+import { useCurrency } from '@/hooks/useCurrency';
 import { ICON_MAP } from '../../categories/constants';
 import { TransactionType } from '../types';
 interface Props {

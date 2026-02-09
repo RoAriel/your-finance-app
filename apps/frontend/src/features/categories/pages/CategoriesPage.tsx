@@ -5,7 +5,7 @@ import { CategoryCard } from '../components/CategoryCard'; // Asegúrate de tene
 import { CategoryModal } from '../components/CategoryModal';
 import { CategoryType } from '../types';
 import type { Category } from '../types';
-import { useConfirm } from '../../../context/ConfirmContext';
+import { useConfirm } from '@/context/ConfirmContext';
 
 export const CategoriesPage = () => {
   const { categories: rawData, isLoading } = useCategories();

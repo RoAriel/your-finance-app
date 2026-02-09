@@ -4,10 +4,10 @@ import { useBudgets } from '../hooks/useBudgets';
 import { BudgetCard } from '../components/BudgetCard';
 import { CreateBudgetModal } from '../components/CreateBudgetModal';
 import type { Budget } from '../services/budgets.service';
-import { useConfirm } from '../../../context/ConfirmContext';
+import { useConfirm } from '@/context/ConfirmContext';
 
 // 👇 IMPORTAMOS EL COMPONENTE REUTILIZABLE (Ajusta la ruta si lo moviste a common)
-import { MonthSelector } from '../../../components/common/MonthSelector';
+import { MonthSelector } from '@/components/common/MonthSelector';
 
 export const BudgetsPage = () => {
   // 1. Estados para Fecha (Mantenemos la lógica numérica para el hook)

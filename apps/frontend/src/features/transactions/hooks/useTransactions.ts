@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionsService } from '../services/transactions.service';
 import type { CreateTransactionDTO, UpdateTransactionDTO } from '../types';
-import { api } from '../../../lib/axios';
-import type { PaginatedResponse } from '../../../types';
+import { api } from '@/lib/axios';
+import type { PaginatedResponse } from '@/types';
 import type { Transaction } from '../types';
 
 interface TransactionFilters {

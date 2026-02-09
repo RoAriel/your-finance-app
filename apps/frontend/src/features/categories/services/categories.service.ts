@@ -1,6 +1,6 @@
-import { api } from '../../../lib/axios';
+import { api } from '@/lib/axios';
 import type { Category, CreateCategoryDTO, UpdateCategoryDTO } from '../types';
-import type { PaginatedResponse } from '../../../types';
+import type { PaginatedResponse } from '@/types';
 
 interface CategoryParams {
   page?: number;

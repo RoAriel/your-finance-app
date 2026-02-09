@@ -7,7 +7,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import type { Budget } from '../services/budgets.service';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 // 👇 Importamos el mapa de iconos
 import { ICON_MAP } from '../../categories/constants';
 

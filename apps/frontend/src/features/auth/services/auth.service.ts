@@ -1,6 +1,6 @@
-import { api } from '../../../lib/axios';
+import { api } from '@/lib/axios';
 import type { AuthResponse, LoginCredentials, RegisterDto } from '../types'; // 👈 Agregamos RegisterDto
-import { logger } from '../../../utils/appLogger';
+import { logger } from '@/utils/appLogger';
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {

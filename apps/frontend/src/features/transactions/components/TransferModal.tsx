@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, ArrowRight, ArrowRightLeft } from 'lucide-react';
 import { useAccounts } from '../../accounts/hooks/useAccounts';
-import { AccountSelector } from '../../../components/common/AccountSelector';
+import { AccountSelector } from '@/components/common/AccountSelector';
 
 interface Props {
   isOpen: boolean;

@@ -1,4 +1,4 @@
-import { api } from '../../../lib/axios';
+import { api } from '@/lib/axios';
 
 // Definimos la interfaz basada en tu User del AuthContext
 export interface UserProfile {

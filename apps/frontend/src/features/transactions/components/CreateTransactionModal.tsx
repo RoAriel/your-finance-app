@@ -10,8 +10,8 @@ import type { Transaction } from '../types';
 import { TransactionType } from '../types';
 import { AccountType } from '../../accounts/types';
 import { CategoryType } from '../../categories/types';
-import { CategorySelector } from '../../../components/common/CategorySelector';
-import { AccountSelector } from '../../../components/common/AccountSelector';
+import { CategorySelector } from '@/components/common/CategorySelector';
+import { AccountSelector } from '@/components/common/AccountSelector';
 
 interface Props {
   isOpen: boolean;

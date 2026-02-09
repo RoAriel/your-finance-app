@@ -7,7 +7,7 @@ import {
   Legend,
 } from 'recharts';
 import type { ChartData } from '../types';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Props {
   data: ChartData[];

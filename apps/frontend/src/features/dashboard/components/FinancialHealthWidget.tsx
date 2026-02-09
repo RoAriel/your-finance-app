@@ -1,5 +1,5 @@
 import { Info } from 'lucide-react';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Props {
   fixed: number;

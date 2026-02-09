@@ -1,4 +1,4 @@
-import { api } from '../../../lib/axios';
+import { api } from '@/lib/axios';
 
 // 1. Interfaces
 export interface Budget {

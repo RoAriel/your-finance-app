@@ -2,7 +2,7 @@ import { useState } from 'react'; // 👈 Adiós useEffect
 import { X, Save, Loader2 } from 'lucide-react';
 import { useBudgets } from '../hooks/useBudgets';
 import type { Budget } from '../services/budgets.service';
-import { CategorySelector } from '../../../components/common/CategorySelector';
+import { CategorySelector } from '@/components/common/CategorySelector';
 import { CategoryType } from '../../categories/types';
 
 interface Props {

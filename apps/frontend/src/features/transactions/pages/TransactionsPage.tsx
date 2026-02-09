@@ -6,10 +6,10 @@ import { Plus } from 'lucide-react';
 import { useTransactions } from '../hooks/useTransactions';
 import { TransactionsTable } from '../components/TransactionsTable';
 import { CreateTransactionModal } from '../components/CreateTransactionModal';
-import { ConfirmationModal } from '../../../components/common/ConfirmationModal';
-import { SearchBar } from '../../../components/common/SearchBar'; // 👈 Tu buscador (Sprint 4 Parte 1)
-import { Pagination } from '../../../components/ui/Pagination'; // 👈 Tu paginación nueva
-import { AccountSelector } from '../../../components/common/AccountSelector'; // Ajusta la ruta si moviste el componente
+import { ConfirmationModal } from '@/components/common/ConfirmationModal';
+import { SearchBar } from '@/components/common/SearchBar'; // 👈 Tu buscador (Sprint 4 Parte 1)
+import { Pagination } from '@/components/ui/Pagination'; // 👈 Tu paginación nueva
+import { AccountSelector } from '@/components/common/AccountSelector'; // Ajusta la ruta si moviste el componente
 import { AccountType } from '../../accounts/types'; // Ajusta ruta
 import type { Transaction } from '../types';
 
