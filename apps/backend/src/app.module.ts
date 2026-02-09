@@ -12,9 +12,13 @@ import { UsersModule } from './user/users.module';
 import { MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { LoggerMiddleware } from './logger.middleware';
 import { ConfigModule } from '@nestjs/config';
-
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'), // Carpeta donde pondrás el icono
+    }),
     PrismaModule,
     AuthModule,
     TransactionsModule,

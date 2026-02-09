@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth.service';
 import type { LoginCredentials, RegisterDto, User } from '../types';
+import { usersService } from '../../users/services/users.service';
 
 interface AuthContextType {
   user: User | null;
@@ -11,8 +12,8 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterDto) => Promise<void>;
   logout: () => void;
-  // 👇 Esto permite actualizar el nombre en la Sidebar sin recargar la página
   updateLocalUser: (userData: Partial<User>) => void;
+  loginWithToken: (token: string) => Promise<void>;
 }
 
 export const useAuth = () => {
@@ -61,6 +62,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser((prev) => (prev ? { ...prev, ...userData } : null));
   };
 
+  const loginWithToken = async (token: string) => {
+    try {
+      // 1. Guardamos token
+      localStorage.setItem('token', token);
+      setIsAuthenticated(true);
+
+      // 2. Buscamos info del usuario (porque el token no tiene el avatar/nombre actualizado)
+      const userProfile = await usersService.getProfile();
+      setUser(userProfile);
+
+      // 3. Redirigimos
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error al obtener perfil con token social', error);
+      logout(); // Si falla, limpiamos todo
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -69,7 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         register,
-        updateLocalUser, // 👈 Importante: Exponemos la función aquí
+        updateLocalUser,
+        loginWithToken,
       }}
     >
       {children}

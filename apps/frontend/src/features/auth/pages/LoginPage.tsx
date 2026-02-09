@@ -4,6 +4,7 @@ import axios from 'axios';
 // 👇 CAMBIO IMPORTANTE: Ya no importamos authService ni useNavigate directamente
 import { useAuth } from '../hooks/useAuth';
 import { Link } from 'react-router-dom';
+import { GoogleLoginButton } from '../components/GoogleLoginButton';
 
 export const LoginPage = () => {
   // 👇 Usamos el hook
@@ -104,6 +105,18 @@ export const LoginPage = () => {
             {isLoading ? 'Ingresando...' : 'Iniciar Sesión'}
           </button>
         </form>
+        {/* 👇 SEPARADOR VISUAL */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">O continúa con</span>
+          </div>
+        </div>
+
+        {/* 👇 BOTÓN GOOGLE */}
+        <GoogleLoginButton />
         <div className="mt-6 flex flex-col items-center gap-2 text-sm">
           {/* Link a Registro */}
           <p className="text-gray-500">

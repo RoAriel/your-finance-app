@@ -6,13 +6,14 @@ export interface UserProfile {
   email: string;
   firstName: string;
   lastName: string;
-  avatarUrl?: string; // Opcional
+  avatarUrl?: string;
+  currency: string;
 }
 
 export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;
-  // currency?: string; // Tu controller lo menciona, lo dejamos preparado
+  currency?: string; // Tu controller lo menciona, lo dejamos preparado
 }
 
 export const usersService = {

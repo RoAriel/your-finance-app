@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   User as UserIcon,
-  //Menu,
 } from 'lucide-react';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 
@@ -28,7 +27,7 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
       icon: <LayoutDashboard size={22} />,
     },
     { to: '/transactions', text: 'Movimientos', icon: <ListTodo size={22} /> },
-    { to: '/savings', text: 'Mis Cuentas', icon: <HandCoins size={22} /> }, // Subido por prioridad
+    { to: '/savings', text: 'Mis Cuentas', icon: <HandCoins size={22} /> },
     { to: '/budgets', text: 'Presupuestos', icon: <Wallet size={22} /> },
     { to: '/categories', text: 'Categorías', icon: <Tags size={22} /> },
     { to: '/profile', text: 'Mi Perfil', icon: <UserIcon size={22} /> },
@@ -43,21 +42,16 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
     >
       {/* 1. LOGO & TOGGLE */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 relative">
-        {/* Logo: Se oculta si colapsa */}
         {!isCollapsed && (
           <h2 className="text-xl font-bold tracking-wide text-white">
             Your<span className="text-primary">Finance</span>
           </h2>
         )}
-
-        {/* Logo versión mini */}
         {isCollapsed && (
           <div className="w-full flex justify-center font-bold text-primary text-xl">
             YF
           </div>
         )}
-
-        {/* Botón Desktop para colapsar */}
         <button
           onClick={toggleCollapse}
           className="absolute -right-3 top-1/2 -translate-y-1/2 bg-primary text-white p-1 rounded-full shadow-lg hover:bg-primary-hover hidden md:flex transition-transform"
@@ -83,15 +77,13 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
             `}
           >
             <span className="shrink-0">{link.icon}</span>
-
-            {/* Texto con transición de opacidad */}
             <span
-              className={`whitespace-nowrap transition-all duration-200 ${isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}
+              className={`whitespace-nowrap transition-all duration-200 ${
+                isCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'
+              }`}
             >
               {link.text}
             </span>
-
-            {/* Tooltip flotante (Solo cuando está colapsado) */}
             {isCollapsed && (
               <div className="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg border border-slate-700">
                 {link.text}
@@ -101,15 +93,28 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
         ))}
       </nav>
 
-      {/* 3. FOOTER */}
+      {/* 3. FOOTER CON AVATAR INTEGRADO */}
       <div className="p-4 border-t border-slate-800 space-y-4">
         {!isCollapsed && user && (
           <div className="flex items-center gap-3 px-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs border border-primary/30">
-              {/* Iniciales */}
-              {user.firstName?.[0]}
-              {user.lastName?.[0]}
+            {/* 👇 LÓGICA DEL AVATAR 👇 */}
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-primary/30 bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>
+                  {user.firstName?.[0]}
+                  {user.lastName?.[0]}
+                </span>
+              )}
             </div>
+            {/* 👆 FIN LÓGICA DEL AVATAR 👆 */}
+
             <div className="overflow-hidden">
               <p className="text-sm font-medium text-white truncate">
                 {user.firstName} {user.lastName}
@@ -118,6 +123,7 @@ export const Sidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
             </div>
           </div>
         )}
+
         <button
           onClick={logout}
           className={`

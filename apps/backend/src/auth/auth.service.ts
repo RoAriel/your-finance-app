@@ -170,66 +170,72 @@ export class AuthService {
       });
     } else {
       // ✨ CASO: Usuario Nuevo -> Lo creamos con todo el setup (Billetera + Categorías)
-      user = await this.prisma.$transaction(async (tx) => {
-        // A. Crear User
-        const newUser = await tx.user.create({
-          data: {
-            email,
-            firstName,
-            lastName,
-            authProvider: AuthProvider.GOOGLE,
-            authProviderId: googleId,
-            avatarUrl: picture,
-            password: null, // Sin password
-            currency: 'ARS', // Default
-            fiscalStartDay: 1,
-          },
-        });
-
-        // B. Crear Billetera Default
-        await tx.account.create({
-          data: {
-            name: 'Efectivo / Billetera',
-            userId: newUser.id,
-            type: AccountType.WALLET,
-            currency: 'ARS',
-            icon: 'wallet',
-            color: '#10B981',
-            balance: 0,
-            isDefault: true,
-          },
-        });
-
-        // C. Crear Categorías (Copiado de tu register logic)
-        for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
-          const parent = await tx.category.create({
+      user = await this.prisma.$transaction(
+        async (tx) => {
+          // A. Crear User
+          const newUser = await tx.user.create({
             data: {
-              name: catData.name,
-              type: catData.type,
-              color: catData.color,
-              icon: catData.icon,
-              isFixed: catData.isFixed,
-              userId: newUser.id,
+              email,
+              firstName,
+              lastName,
+              authProvider: AuthProvider.GOOGLE,
+              authProviderId: googleId,
+              avatarUrl: picture,
+              password: null, // Sin password
+              currency: 'ARS', // Default
+              fiscalStartDay: 1,
             },
           });
 
-          if (catData.children && catData.children.length > 0) {
-            await tx.category.createMany({
-              data: catData.children.map((child) => ({
-                name: child.name,
-                type: child.type,
-                color: child.color,
-                icon: child.icon,
-                isFixed: child.isFixed,
-                parentId: parent.id,
-                userId: newUser.id,
-              })),
-            });
-          }
-        }
+          // B. Crear Billetera Default
+          await tx.account.create({
+            data: {
+              name: 'Efectivo / Billetera',
+              userId: newUser.id,
+              type: AccountType.WALLET,
+              currency: 'ARS',
+              icon: 'wallet',
+              color: '#10B981',
+              balance: 0,
+              isDefault: true,
+            },
+          });
 
-        return newUser;
-      });
+          // C. Crear Categorías (Copiado de tu register logic)
+          for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
+            const parent = await tx.category.create({
+              data: {
+                name: catData.name,
+                type: catData.type,
+                color: catData.color,
+                icon: catData.icon,
+                isFixed: catData.isFixed,
+                userId: newUser.id,
+              },
+            });
+
+            if (catData.children && catData.children.length > 0) {
+              await tx.category.createMany({
+                data: catData.children.map((child) => ({
+                  name: child.name,
+                  type: child.type,
+                  color: child.color,
+                  icon: child.icon,
+                  isFixed: child.isFixed,
+                  parentId: parent.id,
+                  userId: newUser.id,
+                })),
+              });
+            }
+          }
+
+          return newUser;
+        },
+        {
+          maxWait: 5000, // Tiempo máx esperando conexión del pool
+          timeout: 20000, // Tiempo máx para ejecutar toda la transacción (por la latencia de DB)
+        },
+      );
     }
 
     // Retornamos el usuario (passport lo inyectará en req.user)

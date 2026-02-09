@@ -23,9 +23,9 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   async validate(
     accessToken: string,
     refreshToken: string,
-    profile: Profile, // 👈 Tipar esto como Profile
+    profile: Profile,
     done: VerifyCallback,
-  ): Promise<any> {
+  ): Promise<void> {
     const { name, emails, photos, id } = profile;
 
     // Validación defensiva para TypeScript
@@ -38,8 +38,12 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       accessToken,
     };
 
-    const user = await this.authService.validateGoogleUser(userGoogle);
+    try {
+      const user = await this.authService.validateGoogleUser(userGoogle);
 
-    done(null, user);
+      done(null, user);
+    } catch (error) {
+      done(error, undefined);
+    }
   }
 }

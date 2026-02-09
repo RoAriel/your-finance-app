@@ -71,8 +71,12 @@ export class AuthController {
 
     // 👇 Forzamos el tipo string para calmar al linter sobre ConfigService
     const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173';
+      this.configService.get<string>('FRONTEND_URL') ??
+      'http://localhost:5173/dashboard';
 
-    return res.redirect(`${frontendUrl}/oauth/callback?token=${token}`);
+    // 👇 AGREGA ESTE LOG ESPÍA:
+    const finalUrl = `${frontendUrl}/oauth/callback?token=${token}`;
+
+    return res.redirect(finalUrl);
   }
 }

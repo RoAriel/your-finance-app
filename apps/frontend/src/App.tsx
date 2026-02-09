@@ -11,6 +11,7 @@ import { SavingsPage } from './features/accounts/pages/SavingsPage';
 import { RegisterPage } from './features/auth/pages/RegisterPage';
 import { MainLayout } from './layouts/MainLayout';
 import { ProfilePage } from './features/users/pages/ProfilePage';
+import { OAuthCallbackPage } from './features/auth/pages/OAuthCallbackPage';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<MainLayout />}>
                 <Route
