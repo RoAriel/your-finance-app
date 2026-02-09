@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { AuthProvider, AccountType } from '@prisma/client';
+import { AuthProvider, AccountType, Prisma } from '@prisma/client'; // 👈 Importamos Prisma
 import { DEFAULT_CATEGORIES_HIERARCHY } from '../common/constants/default-categories';
 import { GoogleUser } from './interfaces/google-user.interface';
 
@@ -33,7 +33,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Utilizamos una transacción para asegurar que se cree todo o nada
+    // Transacción
     const newUser = await this.prisma.$transaction(
       async (tx) => {
         // 1. Crear Usuario
@@ -45,58 +45,18 @@ export class AuthService {
             lastName,
             currency,
             fiscalStartDay: 1,
+            authProvider: AuthProvider.LOCAL,
           },
         });
 
-        // 2. Crear Billetera Default
-        await tx.account.create({
-          data: {
-            name: 'Efectivo / Billetera',
-            userId: user.id,
-            type: AccountType.WALLET,
-            currency: currency,
-            icon: 'wallet',
-            color: '#10B981',
-            balance: 0,
-            isDefault: true,
-          },
-        });
-
-        // 3. Crear Categorías Iniciales
-        for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
-          const parent = await tx.category.create({
-            data: {
-              name: catData.name,
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              type: catData.type as any,
-              color: catData.color,
-              icon: catData.icon,
-              isFixed: catData.isFixed,
-              userId: user.id,
-            },
-          });
-
-          if (catData.children && catData.children.length > 0) {
-            await tx.category.createMany({
-              data: catData.children.map((child) => ({
-                name: child.name,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                type: child.type as any,
-                color: child.color,
-                icon: child.icon,
-                isFixed: child.isFixed,
-                parentId: parent.id,
-                userId: user.id,
-              })),
-            });
-          }
-        }
+        // 2. Inicializar Activos (DRY ♻️)
+        await this.initializeUserAssets(tx, user.id, currency);
 
         return user;
       },
       {
-        maxWait: 5000, // Tiempo máx esperando conexión del pool
-        timeout: 20000, // Tiempo máx para ejecutar toda la transacción (por la latencia de DB)
+        maxWait: 5000,
+        timeout: 20000,
       },
     );
 
@@ -119,8 +79,6 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    // ✨ Validación extra: Si el usuario existe pero no tiene password
-    // (ej: se creó con Google), no podemos hacer login local.
     if (!user || !user.password) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -152,24 +110,23 @@ export class AuthService {
   async validateGoogleUser(googleUser: GoogleUser) {
     const { email, firstName, lastName, googleId, picture } = googleUser;
 
-    // 1. Buscamos si ya existe el usuario
     let user = await this.prisma.user.findUnique({
       where: { email },
     });
 
     if (user) {
-      // ✅ CASO: Usuario Existe -> Lo vinculamos actualizando su ID de Google y Avatar
+      // Usuario Existe -> Actualizar datos de Google
       user = await this.prisma.user.update({
         where: { id: user.id },
         data: {
           authProvider:
-            user.authProvider === 'LOCAL' ? 'GOOGLE' : user.authProvider, // Opcional: Cambiar provider
-          authProviderId: googleId, // Guardamos el ID de Google para futuro
-          avatarUrl: picture, // Actualizamos foto
+            user.authProvider === 'LOCAL' ? 'GOOGLE' : user.authProvider,
+          authProviderId: googleId,
+          avatarUrl: picture,
         },
       });
     } else {
-      // ✨ CASO: Usuario Nuevo -> Lo creamos con todo el setup (Billetera + Categorías)
+      // Usuario Nuevo -> Crear con transacción
       user = await this.prisma.$transaction(
         async (tx) => {
           // A. Crear User
@@ -181,64 +138,76 @@ export class AuthService {
               authProvider: AuthProvider.GOOGLE,
               authProviderId: googleId,
               avatarUrl: picture,
-              password: null, // Sin password
-              currency: 'ARS', // Default
+              password: null,
+              currency: 'ARS',
               fiscalStartDay: 1,
             },
           });
 
-          // B. Crear Billetera Default
-          await tx.account.create({
-            data: {
-              name: 'Efectivo / Billetera',
-              userId: newUser.id,
-              type: AccountType.WALLET,
-              currency: 'ARS',
-              icon: 'wallet',
-              color: '#10B981',
-              balance: 0,
-              isDefault: true,
-            },
-          });
-
-          // C. Crear Categorías (Copiado de tu register logic)
-          for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
-            const parent = await tx.category.create({
-              data: {
-                name: catData.name,
-                type: catData.type,
-                color: catData.color,
-                icon: catData.icon,
-                isFixed: catData.isFixed,
-                userId: newUser.id,
-              },
-            });
-
-            if (catData.children && catData.children.length > 0) {
-              await tx.category.createMany({
-                data: catData.children.map((child) => ({
-                  name: child.name,
-                  type: child.type,
-                  color: child.color,
-                  icon: child.icon,
-                  isFixed: child.isFixed,
-                  parentId: parent.id,
-                  userId: newUser.id,
-                })),
-              });
-            }
-          }
+          // B. Inicializar Activos (DRY ♻️)
+          await this.initializeUserAssets(tx, newUser.id, 'ARS');
 
           return newUser;
         },
         {
-          maxWait: 5000, // Tiempo máx esperando conexión del pool
-          timeout: 20000, // Tiempo máx para ejecutar toda la transacción (por la latencia de DB)
+          maxWait: 5000,
+          timeout: 20000,
         },
       );
     }
 
-    // Retornamos el usuario (passport lo inyectará en req.user)
     return user;
+  }
+
+  /**
+   * Método privado para crear la Billetera Default y las Categorías Iniciales.
+   * Se reutiliza tanto en Registro Local como en Google Auth.
+   */
+  private async initializeUserAssets(
+    tx: Prisma.TransactionClient, // Recibimos la transacción actual
+    userId: string,
+    currency: string,
+  ) {
+    // 1. Crear Billetera Default
+    await tx.account.create({
+      data: {
+        name: 'Efectivo / Billetera',
+        userId,
+        type: AccountType.WALLET,
+        currency,
+        icon: 'wallet',
+        color: '#10B981',
+        balance: 0,
+        isDefault: true,
+      },
+    });
+
+    // 2. Crear Categorías Iniciales
+    for (const catData of DEFAULT_CATEGORIES_HIERARCHY) {
+      const parent = await tx.category.create({
+        data: {
+          name: catData.name,
+          type: catData.type, // Ya tipado correctamente gracias a tu fix anterior
+          color: catData.color,
+          icon: catData.icon,
+          isFixed: catData.isFixed,
+          userId,
+        },
+      });
+
+      if (catData.children && catData.children.length > 0) {
+        await tx.category.createMany({
+          data: catData.children.map((child) => ({
+            name: child.name,
+            type: child.type,
+            color: child.color,
+            icon: child.icon,
+            isFixed: child.isFixed,
+            parentId: parent.id,
+            userId,
+          })),
+        });
+      }
+    }
   }
 }

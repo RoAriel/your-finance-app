@@ -1,8 +1,7 @@
-import { CategoryType } from '../../categories/dto/create-category.dto';
-
+import { CategoryType } from '@prisma/client';
 export interface DefaultCategory {
   name: string;
-  type: CategoryType; // Usamos el Enum, no strings sueltos
+  type: CategoryType; // Ahora esto es compatible al 100% con la DB
   icon: string;
   color: string;
   isFixed: boolean;
