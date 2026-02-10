@@ -1,17 +1,15 @@
 import { QueryClient, MutationCache } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { isAxiosError } from 'axios';
 
-// Helper para extraer el mensaje limpio del error que manda NestJS
-const getErrorMessage = (error: any) => {
-  // NestJS con class-validator a veces devuelve un array de strings
-  const message = error.response?.data?.message;
-
-  if (Array.isArray(message)) {
-    return message[0]; // Ej: "El monto debe ser positivo"
+// Helper para extraer el mensaje limpio del error
+const getErrorMessage = (error: unknown) => {
+  if (isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) return message[0];
+    if (typeof message === 'string') return message;
   }
-  if (typeof message === 'string') {
-    return message; // Ej: "Saldo insuficiente"
-  }
+  if (error instanceof Error) return error.message;
   return 'Ocurrió un error inesperado';
 };
 
@@ -23,44 +21,35 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
     },
   },
-  // 👇 AQUÍ ESTÁ LA MAGIA GLOBAL
   mutationCache: new MutationCache({
     onError: (error) => {
       const msg = getErrorMessage(error);
 
-      // Lanzamos la notificación visual
+      // 👇 ESTILO TAILWIND PURO (Error)
       toast.error(msg, {
         duration: 4000,
         position: 'top-center',
-        style: {
-          background: '#FEF2F2', // Rojo muy suave
-          color: '#991B1B', // Rojo oscuro
-          border: '1px solid #F87171',
-          padding: '16px',
-          fontWeight: 500,
-        },
+        className:
+          'bg-red-50 border border-red-200 text-red-800 font-medium shadow-lg',
         iconTheme: {
-          primary: '#EF4444',
-          secondary: '#FEF2F2',
+          primary: '#EF4444', // Tailwind red-500
+          secondary: '#FEF2F2', // Tailwind red-50
         },
       });
     },
-    // Opcional: También puedes poner un toast de éxito global aquí si quisieras
     onSuccess: () => {
-      // Lanzamos la notificación visual de éxito
+      // 👇 ESTILO TAILWIND PURO (Éxito)
+      // Nota: Si quieres un mensaje específico por mutación,
+      // puedes pasar onSuccess en el hook individual en vez de aquí globalmente.
+      // Pero como default está bien.
       toast.success('Operación exitosa', {
-        duration: 4000,
+        duration: 3000,
         position: 'top-center',
-        style: {
-          background: '#F0FDF4', // Verde muy suave (Green-50)
-          color: '#166534', // Verde oscuro (Green-800)
-          border: '1px solid #4ADE80', // Verde vibrante (Green-400)
-          padding: '16px',
-          fontWeight: 500,
-        },
+        className:
+          'bg-green-50 border border-green-200 text-green-800 font-medium shadow-lg',
         iconTheme: {
-          primary: '#22C55E', // Verde estándar (Green-500)
-          secondary: '#F0FDF4', // Mismo fondo que el toast
+          primary: '#10B981', // Tailwind emerald-500
+          secondary: '#ECFDF5', // Tailwind emerald-50
         },
       });
     },
