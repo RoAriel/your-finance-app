@@ -1,63 +1,90 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriesService } from '../services/categories.service';
+import { categoryKeys } from '../keys'; // 👈 Importamos las llaves
 import type {
   CreateCategoryDTO,
   UpdateCategoryDTO,
   CategoryType,
 } from '../types';
 
-// 1. Hook para OBTENER (Lectura)
-export const useCategories = (type?: CategoryType) => {
-  const query = useQuery({
-    // 👇 FIX: Agregamos 'type' a la key. Esto arregla el linter y mejora el caching.
-    queryKey: ['categories', { type }],
-    queryFn: () => categoriesService.getAll({ limit: 100 }), // Nota: Si tu servicio soporta filtrado por query params, pásalo aquí. Si filtra en frontend, está bien así.
-    staleTime: 1000 * 60 * 10,
-  });
+interface UseCategoriesProps {
+  type?: CategoryType; // Filtro opcional
+  search?: string;
+}
 
-  return {
-    // Si el servicio devuelve paginado { data: [], meta: ... }, accedemos a .data
-    // Si devuelve array directo, ajustamos. Según tu código anterior era PaginatedResponse.
-    categories: query.data?.data || [],
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
-  };
-};
-
-// 2. Hook para CREAR
-export const useCreateCategory = () => {
+export const useCategories = (overrides?: UseCategoriesProps) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  // 1. Estado local (si quisieras paginar o filtrar desde la UI)
+  const [internalFilters, setInternalFilters] = useState({
+    page: 1,
+    limit: 100, // Traemos muchas por defecto para selectores
+    search: '',
+    type: undefined as CategoryType | undefined,
+  });
+
+  const activeFilters = { ...internalFilters, ...overrides };
+
+  // 2. QUERY (Lectura)
+  const query = useQuery({
+    queryKey: categoryKeys.list(
+      activeFilters as unknown as Record<string, unknown>
+    ),
+    queryFn: () => categoriesService.getAll(activeFilters),
+    placeholderData: (previousData) => previousData,
+    staleTime: 1000 * 60 * 5, // 5 minutos (las categorías no cambian tanto)
+  });
+
+  // 3. MUTACIONES (Escritura)
+
+  // Crear
+  const createMutation = useMutation({
     mutationFn: (data: CreateCategoryDTO) => categoriesService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      // 👇 Invalidamos todo para que se actualicen las listas en selectores y tablas
+      queryClient.invalidateQueries({ queryKey: categoryKeys.all });
     },
   });
-};
 
-// 3. Hook para ACTUALIZAR
-export const useUpdateCategory = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
+  // Actualizar
+  const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateCategoryDTO }) =>
       categoriesService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: categoryKeys.all });
+      // Si cambias el nombre de una categoría, invalidamos transacciones para que se refleje
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
-};
 
-// 4. Hook para ELIMINAR
-export const useDeleteCategory = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
+  // Eliminar
+  const deleteMutation = useMutation({
     mutationFn: (id: string) => categoriesService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: categoryKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });
+
+  return {
+    // Datos
+    ...query,
+    categories: query.data?.data || [], // Array limpio
+    meta: query.data?.meta,
+
+    // Acciones
+    createCategory: createMutation.mutateAsync,
+    updateCategory: updateMutation.mutateAsync,
+    deleteCategory: deleteMutation.mutateAsync,
+
+    // Estados de carga de acciones
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+
+    // Filtros
+    filters: internalFilters,
+    setFilters: setInternalFilters,
+  };
 };

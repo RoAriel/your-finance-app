@@ -1,6 +1,7 @@
 import { api } from '@/lib/axios';
 import type { Category, CreateCategoryDTO, UpdateCategoryDTO } from '../types';
 import type { PaginatedResponse } from '@/types';
+import { cleanObject } from '@/utils/api-helpers';
 
 interface CategoryParams {
   page?: number;
@@ -16,7 +17,7 @@ export const categoriesService = {
   ): Promise<PaginatedResponse<Category>> => {
     // Le decimos a Axios que el cuerpo de la respuesta tiene esa forma
     const { data } = await api.get<PaginatedResponse<Category>>('/categories', {
-      params,
+      params: params ? cleanObject(params) : {},
     });
 
     return data;
