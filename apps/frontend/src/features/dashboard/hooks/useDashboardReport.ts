@@ -1,36 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/axios';
-import type { DashboardReportResponse } from '../types';
+import { dashboardService } from '../services/dashboard.service';
+import { dashboardKeys } from '../keys';
 
-interface Filters {
+interface DashboardFilters {
   month: number;
   year: number;
 }
 
-const getDashboardReport = async ({ month, year }: Filters) => {
-  // Asumimos que el backend acepta query params para filtrar
-  const response = await api.get<DashboardReportResponse>(
-    '/reports/dashboard',
-    {
-      params: { month, year },
-    }
-  );
-  return response.data;
-};
-
-export const useDashboardReport = (filters: Filters) => {
+export const useDashboardReport = (filters: DashboardFilters) => {
   return useQuery({
-    // 1. CORRECCIÓN DE LLAVE: Usamos 'dashboard' para coincidir con la invalidación
-    // Si prefieres 'dashboard-report', debes cambiarlo también en useTransactions.ts
-    queryKey: ['dashboard', filters],
-
-    // 2. LOGS TÁCTICOS INTEGRADOS
-    queryFn: async () => {
-      const data = await getDashboardReport(filters);
-
-      return data;
-    },
-
-    placeholderData: (previousData) => previousData,
+    // 👇 Usamos la llave estandarizada
+    queryKey: dashboardKeys.report(
+      filters as unknown as Record<string, unknown>
+    ),
+    queryFn: () => dashboardService.getReport(filters),
+    placeholderData: (previousData) => previousData, // Evita parpadeos al cambiar de mes
   });
 };
