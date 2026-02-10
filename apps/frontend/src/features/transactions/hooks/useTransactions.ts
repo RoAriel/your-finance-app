@@ -1,26 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { transactionsService } from '../services/transactions.service';
-import type { CreateTransactionDTO, UpdateTransactionDTO } from '../types';
-import { api } from '@/lib/axios';
-import type { PaginatedResponse } from '@/types';
-import type { Transaction } from '../types';
+import type {
+  CreateTransactionDTO,
+  UpdateTransactionDTO,
+  TransactionFilters,
+} from '../types';
 
-interface TransactionFilters {
-  month?: number;
-  year?: number;
-  page?: number;
-  limit?: number;
-  search?: string;
-  accountId?: string;
-  startDate?: string;
-  endDate?: string;
-}
 export const useTransactions = (overrides?: TransactionFilters) => {
   const queryClient = useQueryClient();
 
   // 1. Estado local para filtros (Search, Fechas, etc.)
-
   const [internalFilters, setInternalFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -32,52 +22,32 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     endDate: '',
   });
 
-  const activeFilters = overrides || internalFilters;
+  // Fusionamos filtros internos con los que vengan de props (overrides)
+  const activeFilters = { ...internalFilters, ...overrides };
 
   // 2. EL QUERY (Obtener datos)
   const query = useQuery({
+    // La key incluye los filtros para que React Query refresque automático si cambian
     queryKey: ['transactions', activeFilters],
-    queryFn: async () => {
-      // 👇 Lógica de params mejorada
-      const params = new URLSearchParams();
 
-      // Filtros básicos
-      params.append('page', (activeFilters.page || 1).toString());
-      params.append('limit', (activeFilters.limit || 10).toString());
-      if (activeFilters.search) params.append('search', activeFilters.search);
-      if (activeFilters.accountId)
-        params.append('accountId', activeFilters.accountId);
+    // 👇 ¡AQUÍ ESTÁ LA MAGIA!
+    // Ya no construimos URLSearchParams aquí. Llamamos al servicio y él se encarga.
+    queryFn: () => transactionsService.getAll(activeFilters),
 
-      // Lógica de Fechas: Rango específico mata a Mes/Año
-      if (activeFilters.startDate && activeFilters.endDate) {
-        params.append('startDate', activeFilters.startDate);
-        params.append('endDate', activeFilters.endDate);
-      } else {
-        // Fallback a mes/año si no hay rango completo
-        if (activeFilters.month)
-          params.append('month', activeFilters.month.toString());
-        if (activeFilters.year)
-          params.append('year', activeFilters.year.toString());
-      }
-
-      const { data } = await api.get<PaginatedResponse<Transaction>>(
-        `/transactions?${params.toString()}`
-      );
-      return data;
-    },
+    // Mantiene los datos viejos mientras cargan los nuevos (mejor UX al paginar)
+    placeholderData: (previousData) => previousData,
   });
 
-  // 3. MUTACIÓN: CREAR
+  // 3. MUTACIONES (Crear, Actualizar, Borrar) - Estas quedan igual
   const createMutation = useMutation({
     mutationFn: (data: CreateTransactionDTO) =>
       transactionsService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] }); // Actualizar gráficos también
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
-  // 4. MUTACIÓN: ACTUALIZAR
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTransactionDTO }) =>
       transactionsService.update(id, data),
@@ -87,7 +57,6 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     },
   });
 
-  // 5. MUTACIÓN: ELIMINAR (La que te faltaba)
   const deleteMutation = useMutation({
     mutationFn: (id: string) => transactionsService.delete(id),
     onSuccess: () => {
@@ -96,29 +65,26 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     },
   });
 
-  // 6. RETORNO UNIFICADO (Super Hook)
+  // 4. RETORNO UNIFICADO
   return {
-    // Propiedades del Query (data, isLoading, error, etc.)
     ...query,
     transactions: query.data?.data || [],
     meta: query.data?.meta,
-    // Funciones de Mutación
+
     createTransaction: createMutation.mutateAsync,
     updateTransaction: updateMutation.mutateAsync,
-    deleteTransaction: deleteMutation.mutateAsync, // <--- ¡Aquí está la magia!
+    deleteTransaction: deleteMutation.mutateAsync,
 
-    // Filtros para la UI
     filters: internalFilters,
     setFilters: setInternalFilters,
 
-    // Estados de carga extra
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
   };
 };
 
-// Hooks auxiliares para componentes específicos (opcional, por compatibilidad)
+// Hooks auxiliares exportados por si se usan individualmente
 export const useCreateTransaction = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -152,11 +118,10 @@ export const useDeleteTransaction = () => {
     },
   });
 };
+
 export const useBalance = () => {
   return useQuery({
     queryKey: ['balance'],
     queryFn: transactionsService.getBalance,
-    // Opcional: refetch interval si quieres que se actualice solo
-    // refetchInterval: 60000,
   });
 };

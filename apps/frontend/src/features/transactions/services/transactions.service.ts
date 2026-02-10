@@ -1,21 +1,34 @@
-import { api } from '@/lib/axios';
+import { api } from '@/lib/axios'; // 👈 Alias nuevo
+import { cleanObject } from '@/utils/api-helpers'; // 👈 Utilidad nueva
 import type {
   TransactionsResponse,
   Transaction,
   BalanceResponse,
-  CreateTransactionDTO, // <--- Importar
+  CreateTransactionDTO,
   UpdateTransactionDTO,
   TransactionFilters,
 } from '../types';
 
-// Definimos qué datos necesitamos para crear (sin ID, ni fechas, eso lo pone el back)
-
 export const transactionsService = {
   getAll: async (filters?: TransactionFilters) => {
-    // Pasamos los params en la URL para que el backend pagine
+    // 1. Creamos una copia de los filtros para poder modificarla sin romper nada
+    // (Casteamos a 'any' momentáneamente para permitir borrar propiedades opcionales sin líos de TS estricto)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const paramsToSend: any = { ...filters };
+
+    // 2. LÓGICA DE NEGOCIO:
+    // Si el usuario eligió un Rango de Fechas específico, borramos mes y año
+    // para que el backend no se confunda.
+    if (paramsToSend.startDate && paramsToSend.endDate) {
+      delete paramsToSend.month;
+      delete paramsToSend.year;
+    }
+
+    // 3. Limpiamos propiedades vacías y enviamos
     const response = await api.get<TransactionsResponse>('/transactions', {
-      params: filters,
+      params: filters ? cleanObject(paramsToSend) : {},
     });
+
     return response.data;
   },
 
@@ -25,7 +38,6 @@ export const transactionsService = {
   },
 
   delete: async (id: string) => {
-    // Asumiendo que tu backend usa DELETE /transactions/:id
     await api.delete(`/transactions/${id}`);
   },
 
