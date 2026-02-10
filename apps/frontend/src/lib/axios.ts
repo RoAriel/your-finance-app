@@ -1,28 +1,29 @@
 import axios, { AxiosError } from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { logger } from '../utils/appLogger';
-console.log('🔗 API URL configurada:', import.meta.env.VITE_API_URL);
-// 1. Crear instancia base
+
+// 1. Configurar URL base
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Aseguramos que termine en /api si no lo tiene (ajusta según tu backend)
+const baseURL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
+
+console.log('🔗 API URL configurada:', baseURL);
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  // Timeout de 10 segundos para no dejar la UI colgada eternamente
   timeout: 30000,
 });
 
 // 2. Interceptor de REQUEST (Salida)
-// Se ejecuta ANTES de que la petición salga hacia el backend
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // Aquí recuperaremos el token (más adelante lo conectaremos con AuthStore)
     const token = localStorage.getItem('token');
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     logger.debug(`🚀 Request: ${config.method?.toUpperCase()} ${config.url}`);
     return config;
   },
@@ -33,37 +34,43 @@ api.interceptors.request.use(
 );
 
 // 3. Interceptor de RESPONSE (Entrada)
-// Se ejecuta cuando el backend responde
 api.interceptors.response.use(
   (response) => {
     logger.debug(`✅ Response: ${response.status} ${response.config.url}`);
     return response;
   },
   (error: AxiosError) => {
-    // Manejo global de errores
+    // A. Error con respuesta del servidor
     if (error.response) {
-      // El servidor respondió con un código de error (4xx, 5xx)
       const status = error.response.status;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = error.response.data as any;
 
       logger.error(`❌ API Error [${status}]`, data);
 
+      // 👇 AQUÍ ESTÁ LA MAGIA DE SEGURIDAD
       if (status === 401) {
-        logger.warn(
-          'Sesión expirada o token inválido. Redirigiendo a login...'
-        );
-        // TODO: Aquí dispararemos el logout automático más adelante
-        // localStorage.removeItem('token');
-        // window.location.href = '/login';
+        logger.warn('Sesión expirada. Cerrando sesión...');
+
+        // 1. Limpiamos el token corrupto/vencido
+        localStorage.removeItem('token');
+
+        // 2. Redirigimos al login (Fuerza bruta necesaria fuera de componentes React)
+        // Evitamos bucle infinito si ya estamos en login
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = '/login?error=session_expired';
+        }
       }
-    } else if (error.request) {
-      // La petición se hizo pero no hubo respuesta (Backend caído o sin internet)
+    }
+    // B. Error de red (sin respuesta)
+    else if (error.request) {
       logger.error(
         'Sin respuesta del servidor. Verifica tu conexión.',
         error.request
       );
-    } else {
+    }
+    // C. Error de configuración
+    else {
       logger.error('Error desconocido', error.message);
     }
 
