@@ -1,4 +1,5 @@
 import { api } from '@/lib/axios';
+import { cleanObject } from '@/utils/api-helpers';
 
 // 1. Interfaces
 export interface Budget {
@@ -30,12 +31,11 @@ export interface UpdateBudgetDTO {
 export const budgetsService = {
   // Busca presupuestos filtrando por mes y año
   findAll: async (month: number, year: number): Promise<Budget[]> => {
-    const params = new URLSearchParams();
-    params.append('month', month.toString());
-    params.append('year', year.toString());
-
-    const { data } = await api.get<Budget[]>(`/budgets?${params.toString()}`);
-    return data;
+    // 👇 Usamos cleanObject para limpiar y Axios para serializar params
+    const response = await api.get<Budget[]>('/budgets', {
+      params: cleanObject({ month, year }),
+    });
+    return response.data;
   },
 
   create: async (dto: CreateBudgetDTO): Promise<Budget> => {
@@ -43,7 +43,6 @@ export const budgetsService = {
     return data;
   },
 
-  // CORREGIDO: Ahora recibe el DTO completo, no solo el número
   update: async (id: string, dto: UpdateBudgetDTO): Promise<Budget> => {
     const { data } = await api.patch<Budget>(`/budgets/${id}`, dto);
     return data;

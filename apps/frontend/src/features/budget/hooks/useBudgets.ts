@@ -1,79 +1,79 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { budgetsService } from '../services/budgets.service';
+import { budgetKeys } from '../keys'; // 👈 Importamos llaves
 import type {
-  Budget,
   CreateBudgetDTO,
   UpdateBudgetDTO,
 } from '../services/budgets.service';
 
 export const useBudgets = (month: number, year: number) => {
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  // 1. Cargar datos (Se ejecuta al montar y cuando cambia month/year)
-  const fetchBudgets = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await budgetsService.findAll(month, year);
-      setBudgets(data);
-    } catch (err) {
-      console.error('Error fetching budgets:', err);
-      setError('No se pudieron cargar los presupuestos.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [month, year]);
+  // 1. QUERY (Reemplaza al useEffect + useState)
+  // Cada vez que cambie month o year, React Query refetchea automáticamente.
+  const query = useQuery({
+    queryKey: budgetKeys.list({ month, year }),
+    queryFn: () => budgetsService.findAll(month, year),
+    staleTime: 1000 * 60 * 5, // 5 minutos de caché
+    placeholderData: (previousData) => previousData, // Mantiene datos viejos al cambiar de mes (mejor UX)
+  });
 
-  // 2. Efecto disparador
-  useEffect(() => {
-    fetchBudgets();
-  }, [fetchBudgets]);
+  // 2. MUTACIONES
 
-  // --- CRUD METHODS ---
+  // Crear
+  const createMutation = useMutation({
+    mutationFn: (dto: CreateBudgetDTO) => budgetsService.create(dto),
+    onSuccess: () => {
+      // Invalidamos la lista actual para ver el nuevo presupuesto
+      queryClient.invalidateQueries({
+        queryKey: budgetKeys.list({ month, year }),
+      });
+      // El dashboard general también cambia
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
 
-  const createBudget = async (dto: CreateBudgetDTO) => {
-    try {
-      const newBudget = await budgetsService.create(dto);
-      // Recargamos para ver el nuevo presupuesto reflejado
-      await fetchBudgets();
-      return newBudget;
-    } catch (err) {
-      console.error('Error creating budget:', err);
-      throw err;
-    }
-  };
+  // Actualizar
+  const updateMutation = useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateBudgetDTO }) =>
+      budgetsService.update(id, dto),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: budgetKeys.list({ month, year }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
 
-  const updateBudget = async (id: string, dto: UpdateBudgetDTO) => {
-    try {
-      const updated = await budgetsService.update(id, dto);
-      await fetchBudgets();
-      return updated;
-    } catch (err) {
-      console.error('Error updating budget:', err);
-      throw err;
-    }
-  };
-
-  const deleteBudget = async (id: string) => {
-    try {
-      await budgetsService.delete(id);
-      // Actualizamos estado local
-      setBudgets((prev) => prev.filter((b) => b.id !== id));
-    } catch (err) {
-      console.error('Error deleting budget:', err);
-      throw err;
-    }
-  };
+  // Borrar
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => budgetsService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: budgetKeys.list({ month, year }),
+      });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
 
   return {
-    budgets,
-    isLoading,
-    error,
-    createBudget,
-    updateBudget,
-    deleteBudget,
-    refetch: fetchBudgets,
+    // Datos limpios directos del query
+    budgets: query.data || [],
+    isLoading: query.isLoading,
+    error: query.error,
+
+    // Acciones
+    createBudget: createMutation.mutateAsync,
+    updateBudget: (id: string, dto: UpdateBudgetDTO) =>
+      updateMutation.mutateAsync({ id, dto }), // Wrapper para coincidir con la firma anterior
+    deleteBudget: deleteMutation.mutateAsync,
+
+    // Estados de carga
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
+
+    // Refetch manual (rara vez necesario con React Query, pero lo mantenemos por compatibilidad)
+    refetch: query.refetch,
   };
 };
