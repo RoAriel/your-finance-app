@@ -6,11 +6,12 @@ import type {
   UpdateTransactionDTO,
   TransactionFilters,
 } from '../types';
+import { transactionKeys } from '../keys'; // 👈 IMPORTANTE: Importamos las llaves
 
 export const useTransactions = (overrides?: TransactionFilters) => {
   const queryClient = useQueryClient();
 
-  // 1. Estado local para filtros (Search, Fechas, etc.)
+  // 1. Estado local para filtros
   const [internalFilters, setInternalFilters] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -22,50 +23,52 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     endDate: '',
   });
 
-  // Fusionamos filtros internos con los que vengan de props (overrides)
+  // Fusionamos filtros internos con los que vengan de props
   const activeFilters = { ...internalFilters, ...overrides };
 
-  // 2. EL QUERY (Obtener datos)
+  // 2. QUERY (Lectura)
   const query = useQuery({
-    // La key incluye los filtros para que React Query refresque automático si cambian
-    queryKey: ['transactions', activeFilters],
-
-    // 👇 ¡AQUÍ ESTÁ LA MAGIA!
-    // Ya no construimos URLSearchParams aquí. Llamamos al servicio y él se encarga.
+    // 👇 Usamos la fábrica para generar la key única basada en los filtros
+    queryKey: transactionKeys.list(
+      activeFilters as unknown as Record<string, unknown>
+    ),
     queryFn: () => transactionsService.getAll(activeFilters),
-
-    // Mantiene los datos viejos mientras cargan los nuevos (mejor UX al paginar)
     placeholderData: (previousData) => previousData,
   });
 
-  // 3. MUTACIONES (Crear, Actualizar, Borrar) - Estas quedan igual
+  // 3. MUTACIONES (Escritura)
+
+  // Crear
   const createMutation = useMutation({
     mutationFn: (data: CreateTransactionDTO) =>
       transactionsService.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      // 👇 Invalidamos TO-DO lo relacionado con transacciones (listas, balance, detalles)
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
+      // También refrescamos el dashboard global
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
+  // Actualizar
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateTransactionDTO }) =>
       transactionsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
+  // Eliminar
   const deleteMutation = useMutation({
     mutationFn: (id: string) => transactionsService.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
-  // 4. RETORNO UNIFICADO
   return {
     ...query,
     transactions: query.data?.data || [],
@@ -84,13 +87,14 @@ export const useTransactions = (overrides?: TransactionFilters) => {
   };
 };
 
-// Hooks auxiliares exportados por si se usan individualmente
+// --- Hooks Auxiliares (si los usas en otros componentes) ---
+
 export const useCreateTransaction = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: transactionsService.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
@@ -102,7 +106,7 @@ export const useUpdateTransaction = () => {
     mutationFn: ({ id, data }: { id: string; data: UpdateTransactionDTO }) =>
       transactionsService.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
@@ -113,7 +117,7 @@ export const useDeleteTransaction = () => {
   return useMutation({
     mutationFn: transactionsService.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
@@ -121,7 +125,8 @@ export const useDeleteTransaction = () => {
 
 export const useBalance = () => {
   return useQuery({
-    queryKey: ['balance'],
+    // 👇 Key específica para el balance
+    queryKey: transactionKeys.balance(),
     queryFn: transactionsService.getBalance,
   });
 };
