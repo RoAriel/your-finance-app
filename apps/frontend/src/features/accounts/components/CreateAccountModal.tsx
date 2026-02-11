@@ -2,16 +2,23 @@ import { useState } from 'react';
 import { X, Wallet, TrendingUp, PiggyBank } from 'lucide-react';
 import { useAccounts } from '../hooks/useAccounts';
 import { AccountType } from '../types';
-import type { CreateAccountDTO } from '../types';
+import type { CreateAccountDTO, Account } from '../types';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   defaultType?: AccountType; // Para preseleccionar si vienes de un botón específico
+  accountToEdit?: Account | null;
 }
 
-export const CreateAccountModal = ({ isOpen, onClose, defaultType }: Props) => {
-  const { createAccount, isCreating } = useAccounts();
+export const CreateAccountModal = ({
+  isOpen,
+  onClose,
+  defaultType,
+  accountToEdit,
+}: Props) => {
+  const { createAccount, updateAccount, isCreating, isUpdating } =
+    useAccounts();
 
   // Estados del formulario
   const [name, setName] = useState('');
@@ -42,15 +49,22 @@ export const CreateAccountModal = ({ isOpen, onClose, defaultType }: Props) => {
     };
 
     try {
-      await createAccount(dto);
+      if (accountToEdit) {
+        // ✅ MODO EDICIÓN
+        await updateAccount({ id: accountToEdit.id, data: dto });
+      } else {
+        // ✅ MODO CREACIÓN
+        await createAccount(dto);
+      }
       onClose();
     } catch (error) {
-      console.error('Error creando cuenta:', error);
+      console.error('Error guardando cuenta:', error);
     }
   };
 
   if (!isOpen) return null;
 
+  const isLoading = isCreating || isUpdating;
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
@@ -178,18 +192,20 @@ export const CreateAccountModal = ({ isOpen, onClose, defaultType }: Props) => {
 
           <button
             type="submit"
-            disabled={isCreating || !name}
+            disabled={isLoading || !name}
             className={`w-full py-3 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-colors ${
               type === AccountType.SAVINGS
                 ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-200'
                 : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200'
             }`}
           >
-            {isCreating
-              ? 'Creando...'
-              : type === AccountType.SAVINGS
-                ? 'Crear Meta'
-                : 'Crear Billetera'}
+            {isLoading
+              ? 'Guardando...'
+              : accountToEdit
+                ? 'Guardar Cambios'
+                : type === AccountType.SAVINGS
+                  ? 'Crear Meta'
+                  : 'Crear Billetera'}
           </button>
         </form>
       </div>

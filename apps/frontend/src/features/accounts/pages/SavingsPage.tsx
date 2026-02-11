@@ -18,22 +18,31 @@ export const SavingsPage = () => {
   // 3. ESTADOS (Sin useEffects, controlados por montaje/desmontaje)
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [createType, setCreateType] = useState<AccountType>(AccountType.WALLET);
 
   // 4. HANDLERS
   const handleOpenCreateWallet = () => {
+    setEditingAccount(null);
     setCreateType(AccountType.WALLET); // Configuramos el modal para Billetera
     setIsCreateOpen(true); // Abrimos
   };
 
   const handleOpenCreateSavings = () => {
+    setEditingAccount(null); //
     setCreateType(AccountType.SAVINGS); // Configuramos el modal para Meta
     setIsCreateOpen(true); // Abrimos
   };
 
   const handleOpenEdit = (account: Account) => {
-    console.log('Editando cuenta:', account.name);
-    // Aquí iría la lógica para abrir un modal de edición en el futuro
+    setEditingAccount(account);
+    setCreateType(account.type);
+    setIsCreateOpen(true);
+  };
+
+  const handleCloseCreate = () => {
+    setIsCreateOpen(false);
+    setEditingAccount(null); // Limpiamos al cerrar
   };
 
   if (isLoading) {
@@ -167,8 +176,9 @@ export const SavingsPage = () => {
       {isCreateOpen && (
         <CreateAccountModal
           isOpen={isCreateOpen}
-          onClose={() => setIsCreateOpen(false)}
+          onClose={handleCloseCreate}
           defaultType={createType} // Pasamos el tipo (WALLET o SAVINGS)
+          accountToEdit={editingAccount} // Pasamos la cuenta a editar (o null para creación)
         />
       )}
     </div>

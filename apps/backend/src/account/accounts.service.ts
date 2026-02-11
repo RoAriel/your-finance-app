@@ -125,7 +125,7 @@ export class AccountsService {
 
   async transfer(dto: TransferDto, userId: string) {
     const operation = 'Transferencia';
-    const { sourceAccountId, targetAccountId, amount, description } = dto;
+    const { sourceAccountId, targetAccountId, amount, description, date } = dto;
 
     try {
       this.logger.logOperation(operation, dto);
@@ -156,6 +156,8 @@ export class AccountsService {
         throw new BadRequestException('Insufficient funds');
       }
 
+      const transactionDate = date ? new Date(date) : new Date();
+
       // 🔥 Transacción Atómica
       const result = await this.prisma.$transaction(async (tx) => {
         // 1. Restar Origen
@@ -169,7 +171,7 @@ export class AccountsService {
           data: {
             amount: amount,
             description: `Transferencia a: ${targetAccount.name}`,
-            date: new Date(),
+            date: transactionDate,
             type: TransactionType.TRANSFER,
             userId,
             accountId: sourceAccountId, // 👈 CAMBIO: accountId
@@ -190,7 +192,7 @@ export class AccountsService {
             description: description
               ? `Recibido: ${description}`
               : `Desde: ${sourceAccount.name}`,
-            date: new Date(),
+            date: transactionDate,
             type: TransactionType.INCOME,
             userId,
             accountId: targetAccountId, // 👈 CAMBIO: accountId

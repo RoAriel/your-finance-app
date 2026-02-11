@@ -29,7 +29,7 @@ export const TransferModal = ({ isOpen, onClose }: Props) => {
         targetAccountId: targetId,
         amount: parseFloat(amount),
         description: description || 'Transferencia entre cuentas',
-        date: new Date(date).toISOString(),
+        //date: new Date(date).toISOString(),
       });
       onClose(); // Cerrar solo si tuvo éxito
     } catch (error) {

@@ -5,6 +5,7 @@ import {
   IsUUID,
   IsString,
   IsOptional,
+  IsDateString,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -42,4 +43,13 @@ export class TransferDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiProperty({
+    description: 'Fecha de la transferencia (opcional)',
+    example: '2023-10-27T10:00:00Z',
+    required: false,
+  })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
