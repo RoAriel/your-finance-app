@@ -13,6 +13,7 @@ export interface Account {
   name: string;
   balance: number; // El backend calcula esto
   targetAmount?: number; // Solo para cuentas de ahorro
+  targetDate?: string;
   currency: 'ARS' | 'USD' | 'EUR'; // Ajustado a tu modelo
   type: AccountType;
   isDefault: boolean;
@@ -27,6 +28,8 @@ export interface CreateAccountDTO {
   color?: string;
   icon?: string;
   isDefault?: boolean;
+  targetAmount?: number;
+  targetDate?: string;
 }
 
 export type UpdateAccountDTO = Partial<CreateAccountDTO>;

@@ -4,6 +4,15 @@ import path from 'path';
 // --- Configuración ---
 const OUTPUT_FILE = 'todo_el_proyecto.txt';
 const IGNORE_DIRS = ['node_modules', '.git', 'dist', 'build', '.next', '.vscode'];
+const IGNORE_FILES = [
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+  '.env',
+  '.env.local',
+  'merge-files.js', // Ignoramos el propio script para evitar incluirlo en el resultado
+  // Agrega aquí los archivos que quieras ignorar
+];
 const EXTENSIONS = ['.ts', '.js', '.json', '.prisma', '.css'];
 
 const stream = fs.createWriteStream(OUTPUT_FILE);
@@ -21,8 +30,13 @@ function readDirectory(dir) {
       }
     } else {
       // 1. Verificamos que tenga la extensión correcta
-      // 2. IMPORTANTE: Verificamos que no sea el propio archivo de salida
-      if (EXTENSIONS.includes(path.extname(file)) && file !== OUTPUT_FILE) {
+      // 2. Verificamos que no sea el propio archivo de salida
+      // 3. Verificamos que no esté en la lista de archivos ignorados
+      if (
+        EXTENSIONS.includes(path.extname(file)) &&
+        file !== OUTPUT_FILE &&
+        !IGNORE_FILES.includes(file)
+      ) {
         try {
           const content = fs.readFileSync(filePath, 'utf8');
 
