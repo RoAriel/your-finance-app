@@ -1,111 +1,128 @@
 import { useState } from 'react';
-import { LogIn, AlertCircle } from 'lucide-react';
-import axios from 'axios';
-// 👇 CAMBIO IMPORTANTE: Ya no importamos authService ni useNavigate directamente
+import { useForm } from 'react-hook-form';
+import { Link, useNavigate } from 'react-router-dom';
+import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { Link } from 'react-router-dom';
-import { GoogleLoginButton } from '../components/GoogleLoginButton';
+// No importamos authService, lo usa el hook internamente
+import toast from 'react-hot-toast';
+import type { LoginCredentials } from '../types';
 
 export const LoginPage = () => {
-  // 👇 Usamos el hook
-  const { login } = useAuth();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginCredentials>();
+  const navigate = useNavigate();
+  const { login } = useAuth(); // 👈 Usamos la función del contexto
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
+  const onSubmit = async (data: LoginCredentials) => {
     try {
-      // 👇 Llamamos al login del contexto (que ya hace la redirección)
-      await login({ email, password });
-    } catch (err: unknown) {
-      let msg = 'Error al iniciar sesión';
+      // 👇 CAMBIO CLAVE: Pasamos las credenciales al hook
+      // El hook internamente hará: api.post('/login', data) y guardará el token
+      await login(data);
 
-      if (axios.isAxiosError(err) && err.response?.data) {
-        const data = err.response.data as { message: string | string[] };
-        msg = Array.isArray(data.message) ? data.message[0] : data.message;
-      } else if (err instanceof Error) {
-        msg = err.message;
-      }
-
-      setError(msg);
-    } finally {
-      setIsLoading(false);
+      toast.success('¡Bienvenido!');
+      navigate('/dashboard');
+    } catch (error) {
+      console.error(error);
+      toast.error('Credenciales inválidas. Inténtalo de nuevo.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
-            <LogIn className="w-6 h-6 text-primary" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <LogIn className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Bienvenido de nuevo
-          </h2>
-          <p className="text-muted mt-2">Ingresa a tu panel de finanzas</p>
+          <h1 className="text-3xl font-bold text-gray-900">Bienvenido</h1>
+          <p className="text-gray-500">
+            Inicia sesión para gestionar tus finanzas
+          </p>
         </div>
 
-        {/* Formulario */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 5. Alerta de error mejorada */}
-          {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg border border-red-100 flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-              <AlertCircle size={18} className="shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 block">
+              Correo Electrónico
             </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (error) setError(null); // Borramos error al escribir
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-              placeholder="email@email.com"
-            />
+            <div className="relative">
+              <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                {...register('email', {
+                  required: 'El correo es requerido',
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: 'Dirección de correo inválida',
+                  },
+                })}
+                type="email"
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                placeholder="tu@email.com"
+              />
+            </div>
+            {errors.email && (
+              <p className="text-red-500 text-xs pl-1">
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700 block">
               Contraseña
             </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError(null); // Borramos error al escribir
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                {...register('password', {
+                  required: 'La contraseña es requerida',
+                })}
+                type={showPassword ? 'text' : 'password'}
+                className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {errors.password && (
+              <p className="text-red-500 text-xs pl-1">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+
+          <div className="text-right">
+            <a
+              href="#"
+              className="text-sm text-primary font-medium hover:text-primary-hover"
+            >
+              ¿Olvidaste tu contraseña?
+            </a>
           </div>
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full py-2.5 px-4 bg-primary text-white font-semibold rounded-lg hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={isSubmitting}
+            className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-primary/30 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isLoading ? 'Ingresando...' : 'Iniciar Sesión'}
+            {isSubmitting ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              'Iniciar Sesión'
+            )}
           </button>
         </form>
-        {/* 👇 SEPARADOR VISUAL */}
+
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-200"></div>
@@ -115,28 +132,30 @@ export const LoginPage = () => {
           </div>
         </div>
 
-        {/* 👇 BOTÓN GOOGLE */}
-        <GoogleLoginButton />
-        <div className="mt-6 flex flex-col items-center gap-2 text-sm">
-          {/* Link a Registro */}
-          <p className="text-gray-500">
-            ¿No tienes una cuenta?{' '}
-            <Link
-              to="/register"
-              className="font-semibold text-primary hover:text-primary-hover hover:underline transition-colors"
-            >
-              Crear cuenta
-            </Link>
-          </p>
+        <button
+          type="button"
+          onClick={() =>
+            (window.location.href = `${import.meta.env.VITE_API_URL}/auth/google`)
+          }
+          className="w-full bg-white border border-gray-200 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+        >
+          <img
+            src="https://www.google.com/favicon.ico"
+            alt="Google"
+            className="w-5 h-5"
+          />
+          Google
+        </button>
 
-          {/* (Opcional - Best Practice) Link a Recuperar Contraseña */}
+        <p className="text-center text-sm text-gray-600 pt-4">
+          ¿No tienes una cuenta?{' '}
           <Link
-            to="/forgot-password"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            to="/register"
+            className="text-primary font-bold hover:underline"
           >
-            ¿Olvidaste tu contraseña?
+            Regístrate aquí
           </Link>
-        </div>
+        </p>
       </div>
     </div>
   );

@@ -1,220 +1,178 @@
 import { useState } from 'react';
-import { isAxiosError } from 'axios';
-import { Link } from 'react-router-dom';
-import { User, Mail, Lock, Wallet, ArrowRight, Loader2 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useForm } from 'react-hook-form';
+import { Link, useNavigate } from 'react-router-dom';
+import { UserPlus, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
+import { authService } from '../services/auth.service';
 import toast from 'react-hot-toast';
-
-const CURRENCIES = ['ARS', 'USD', 'EUR', 'BRL'];
+import type { RegisterDto } from '../types';
 
 export const RegisterPage = () => {
-  const { register } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  // Definimos un tipo extendido solo para el formulario (no para el backend)
+  type RegisterForm = RegisterDto & { confirmPassword: string };
 
-  // 👇 Estado actualizado: firstName + lastName
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    currency: 'ARS',
-  });
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterForm>();
+  const navigate = useNavigate();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
+  const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Validación básica actualizada
-    if (
-      !formData.email ||
-      !formData.password ||
-      !formData.firstName ||
-      !formData.lastName
-    )
-      return;
+  const onSubmit = async (data: RegisterForm) => {
+    // 🛡️ SANITIZACIÓN: Separamos confirmPassword del resto de los datos
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { confirmPassword, ...dataToSend } = data;
 
     try {
-      setIsLoading(true);
-      await register(formData);
-      toast.success(
-        `¡Bienvenido ${formData.firstName}! Tu billetera está lista.`
-      );
+      // Enviamos solo lo que el backend espera (RegisterDto puro)
+      await authService.register(dataToSend);
+      toast.success('¡Cuenta creada con éxito!');
+      navigate('/login');
     } catch (error) {
-      let errorMessage = 'Ocurrió un error inesperado al registrarse';
-
-      if (isAxiosError(error)) {
-        const data = error.response?.data as { message?: string | string[] };
-        if (data?.message) {
-          errorMessage = Array.isArray(data.message)
-            ? data.message.join(', ')
-            : data.message;
-        }
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      toast.error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      console.error(error);
+      toast.error('Error al registrarse. Verifica tus datos.');
     }
   };
 
+  const password = watch('password');
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-primary p-8 text-center">
-          <div className="mx-auto w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm">
-            <Wallet className="text-white" size={24} />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 space-y-6">
+        <div className="text-center space-y-2">
+          <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <UserPlus className="w-8 h-8 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Crear Cuenta</h1>
-          <p className="text-primary-foreground/80 text-sm">
-            Únete y toma el control de tus finanzas
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Crear Cuenta</h1>
+          <p className="text-gray-500">Comienza a controlar tu dinero hoy</p>
         </div>
 
-        {/* Formulario */}
-        <div className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 👇 NUEVO LAYOUT: Grid para Nombre y Apellido */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Nombre */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <User size={18} />
-                  </span>
-                  <input
-                    name="firstName"
-                    type="text"
-                    placeholder="Juan"
-                    required
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Apellido */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellido
-                </label>
-                <div className="relative">
-                  {/* Icono fantasma para mantener alineación o sin icono */}
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <User size={18} />
-                  </span>
-                  <input
-                    name="lastName"
-                    type="text"
-                    placeholder="Pérez"
-                    required
-                    value={formData.lastName}
-                    onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Correo Electrónico
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Nombre
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Mail size={18} />
-                </span>
+                <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  name="email"
-                  type="email"
-                  placeholder="hola@ejemplo.com"
-                  required
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  {...register('firstName', { required: 'Requerido' })}
+                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                  placeholder="Juan"
                 />
               </div>
             </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">
+                Apellido
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Lock size={18} />
-                </span>
+                <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  name="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  minLength={8}
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none"
+                  {...register('lastName', { required: 'Requerido' })}
+                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                  placeholder="Pérez"
                 />
               </div>
             </div>
+          </div>
 
-            {/* Moneda */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Moneda Principal
-              </label>
-              <select
-                name="currency"
-                value={formData.currency}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white cursor-pointer"
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Correo Electrónico
+            </label>
+            <div className="relative">
+              <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                {...register('email', {
+                  required: 'Requerido',
+                  pattern: { value: /^\S+@\S+$/i, message: 'Email inválido' },
+                })}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                placeholder="tu@email.com"
+              />
+            </div>
+            {errors.email && (
+              <p className="text-red-500 text-xs">{errors.email.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Contraseña
+            </label>
+            <div className="relative">
+              <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                {...register('password', {
+                  required: 'Requerida',
+                  minLength: { value: 8, message: 'Mínimo 8 caracteres' },
+                })}
+                type={showPassword ? 'text' : 'password'}
+                className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
               >
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-6 bg-primary text-white py-3 rounded-lg font-medium hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shadow-lg shadow-primary/30 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <Loader2 size={20} className="animate-spin" />
-              ) : (
-                <>
-                  Crear Cuenta <ArrowRight size={18} />
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            ¿Ya tienes una cuenta?{' '}
-            <Link
-              to="/login"
-              className="text-primary font-semibold hover:underline"
-            >
-              Iniciar Sesión
-            </Link>
+            {errors.password && (
+              <p className="text-red-500 text-xs">{errors.password.message}</p>
+            )}
           </div>
-        </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              Confirmar Contraseña
+            </label>
+            <div className="relative">
+              <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                {...register('confirmPassword', {
+                  required: 'Confirma tu contraseña',
+                  validate: (value: string) =>
+                    value === password || 'Las contraseñas no coinciden',
+                })}
+                type={showPassword ? 'text' : 'password'}
+                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+            {errors.confirmPassword && (
+              <p className="text-red-500 text-xs">
+                {errors.confirmPassword.message}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-primary/30 disabled:opacity-70 mt-4"
+          >
+            {isSubmitting ? 'Creando cuenta...' : 'Registrarse'}
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-gray-600 pt-4">
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/login" className="text-primary font-bold hover:underline">
+            Inicia sesión
+          </Link>
+        </p>
       </div>
     </div>
   );

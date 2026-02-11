@@ -1,4 +1,4 @@
-import { useLocation, Link } from 'react-router-dom'; // 👈 1. Importamos Link
+import { useLocation, Link } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useAuth } from '../../features/auth/hooks/useAuth';
 
@@ -21,7 +21,7 @@ export const TopBar = ({ toggleSidebar }: TopBarProps) => {
 
   const currentTitle = PAGE_TITLES[location.pathname] || 'Your Finance';
 
-  // Helpers para nombres
+  // Helpers para nombres (con fallbacks seguros)
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`
     : 'Usuario';
@@ -32,7 +32,7 @@ export const TopBar = ({ toggleSidebar }: TopBarProps) => {
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-10 shadow-sm">
-      {/* IZQUIERDA */}
+      {/* IZQUIERDA: Menú y Título */}
       <div className="flex items-center gap-4">
         <button
           onClick={toggleSidebar}
@@ -51,16 +51,15 @@ export const TopBar = ({ toggleSidebar }: TopBarProps) => {
         </div>
       </div>
 
-      {/* DERECHA */}
+      {/* DERECHA: Solo Usuario (Limpio) */}
       <div className="flex items-center gap-4">
         <div className="text-right hidden sm:block">
           <p className="text-sm font-semibold text-gray-700">{displayName}</p>
           <p className="text-xs text-gray-500">Cuenta Gratuita</p>
         </div>
 
-        {/* 👇 2. AQUÍ EL CAMBIO: Envolvemos todo el avatar en un Link */}
         <Link to="/profile" title="Ir a mi perfil">
-          <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm ring-2 ring-white shadow-sm cursor-pointer hover:bg-primary/20 transition-colors overflow-hidden">
+          <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm ring-2 ring-white shadow-sm cursor-pointer hover:bg-primary/20 transition-colors overflow-hidden border border-primary/20">
             {user?.avatarUrl ? (
               <img
                 src={user.avatarUrl}

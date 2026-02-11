@@ -7,7 +7,7 @@ import type { CreateAccountDTO, Account } from '../types';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  defaultType?: AccountType; // Para preseleccionar si vienes de un botón específico
+  defaultType?: AccountType;
   accountToEdit?: Account | null;
 }
 
@@ -20,15 +20,29 @@ export const CreateAccountModal = ({
   const { createAccount, updateAccount, isCreating, isUpdating } =
     useAccounts();
 
-  // Estados del formulario
-  const [name, setName] = useState('');
+  // ⚡ SOLUCIÓN "SIN USE-EFFECT":
+  // Inicializamos el estado directamente con las props.
+  // Como el modal se desmonta al cerrarse (en SavingsPage), esto se resetea cada vez que lo abres.
+
+  const [name, setName] = useState(accountToEdit?.name || '');
+
+  // Prioridad: 1. Edición | 2. Default (botón específico) | 3. Wallet
   const [type, setType] = useState<AccountType>(
-    defaultType || AccountType.WALLET
+    accountToEdit?.type || defaultType || AccountType.WALLET
   );
-  const [currency, setCurrency] = useState('ARS');
-  // Campos específicos para Savings
-  const [targetAmount, setTargetAmount] = useState('');
-  const [targetDate, setTargetDate] = useState('');
+
+  const [currency, setCurrency] = useState(accountToEdit?.currency || 'ARS');
+
+  // Para los campos opcionales numéricos/fecha, manejamos la conversión aquí mismo
+  const [targetAmount, setTargetAmount] = useState(
+    accountToEdit?.targetAmount ? accountToEdit.targetAmount.toString() : ''
+  );
+
+  const [targetDate, setTargetDate] = useState(
+    accountToEdit?.targetDate
+      ? new Date(accountToEdit.targetDate).toISOString().split('T')[0]
+      : ''
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,22 +52,19 @@ export const CreateAccountModal = ({
       name,
       type,
       currency,
-      // Solo enviamos estos datos si es una Meta de Ahorro
       ...(type === AccountType.SAVINGS && {
         targetAmount: targetAmount ? parseFloat(targetAmount) : undefined,
         targetDate: targetDate ? new Date(targetDate).toISOString() : undefined,
       }),
-      // Default colors/icons según el tipo (puedes mejorarlo luego con un selector)
+      // Mantenemos color/icono si es nuevo, o reusamos lógica (esto podría mejorar, pero cumple)
       color: type === AccountType.SAVINGS ? '#8B5CF6' : '#10B981',
       icon: type === AccountType.SAVINGS ? 'TrendingUp' : 'Wallet',
     };
 
     try {
       if (accountToEdit) {
-        // ✅ MODO EDICIÓN
         await updateAccount({ id: accountToEdit.id, data: dto });
       } else {
-        // ✅ MODO CREACIÓN
         await createAccount(dto);
       }
       onClose();
@@ -65,10 +76,10 @@ export const CreateAccountModal = ({
   if (!isOpen) return null;
 
   const isLoading = isCreating || isUpdating;
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
           <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2">
             {type === AccountType.SAVINGS ? (
@@ -76,9 +87,11 @@ export const CreateAccountModal = ({
             ) : (
               <Wallet className="text-emerald-600" size={20} />
             )}
-            {type === AccountType.SAVINGS
-              ? 'Nueva Meta de Ahorro'
-              : 'Nueva Cuenta'}
+            {accountToEdit
+              ? 'Editar Cuenta'
+              : type === AccountType.SAVINGS
+                ? 'Nueva Meta de Ahorro'
+                : 'Nueva Cuenta'}
           </h3>
           <button
             onClick={onClose}
@@ -89,35 +102,36 @@ export const CreateAccountModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Selector de Tipo (Solo si no viene predefinido o queremos permitir cambiar) */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setType(AccountType.WALLET)}
-              className={`flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
-                type === AccountType.WALLET
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-medium ring-1 ring-emerald-200'
-                  : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              <Wallet size={18} />
-              Billetera
-            </button>
-            <button
-              type="button"
-              onClick={() => setType(AccountType.SAVINGS)}
-              className={`flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
-                type === AccountType.SAVINGS
-                  ? 'bg-purple-50 border-purple-200 text-purple-700 font-medium ring-1 ring-purple-200'
-                  : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-              }`}
-            >
-              <PiggyBank size={18} />
-              Meta
-            </button>
-          </div>
+          {/* Ocultamos selector de tipo si estamos editando para evitar inconsistencias */}
+          {!accountToEdit && (
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setType(AccountType.WALLET)}
+                className={`flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                  type === AccountType.WALLET
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-medium ring-1 ring-emerald-200'
+                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <Wallet size={18} />
+                Billetera
+              </button>
+              <button
+                type="button"
+                onClick={() => setType(AccountType.SAVINGS)}
+                className={`flex items-center justify-center gap-2 py-3 rounded-lg border transition-all ${
+                  type === AccountType.SAVINGS
+                    ? 'bg-purple-50 border-purple-200 text-purple-700 font-medium ring-1 ring-purple-200'
+                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <PiggyBank size={18} />
+                Meta
+              </button>
+            </div>
+          )}
 
-          {/* Nombre y Moneda */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -143,8 +157,13 @@ export const CreateAccountModal = ({
               </label>
               <select
                 value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white"
+                onChange={(e) =>
+                  setCurrency(e.target.value as 'ARS' | 'USD' | 'EUR')
+                }
+                disabled={!!accountToEdit} // No permitir cambiar moneda al editar
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none bg-white ${
+                  accountToEdit ? 'bg-gray-100 text-gray-500' : ''
+                }`}
               >
                 <option value="ARS">Peso Argentino (ARS)</option>
                 <option value="USD">Dólar Estadounidense (USD)</option>
@@ -153,7 +172,6 @@ export const CreateAccountModal = ({
             </div>
           </div>
 
-          {/* Campos Extra para SAVINGS (Condicionales) */}
           {type === AccountType.SAVINGS && (
             <div className="bg-purple-50 p-4 rounded-xl space-y-4 border border-purple-100 animate-in slide-in-from-top-2 duration-200">
               <h4 className="text-sm font-semibold text-purple-800 flex items-center gap-2">
