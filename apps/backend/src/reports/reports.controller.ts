@@ -5,46 +5,46 @@ import {
   ApiOperation,
   ApiProduces,
 } from '@nestjs/swagger';
-import type { Response } from 'express'; // 👈 Importante: Tipado de Express
-import { ReportsService } from './reports.service';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { AnalyticsService } from './services/analytics.service';
+import { ExportsService } from './services/exports.service';
 
 @ApiTags('Reports')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly exportsService: ExportsService,
+  ) {}
+
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Obtener métricas principales del Dashboard' })
+  async getDashboard(@CurrentUser('id') userId: string) {
+    return this.analyticsService.getDashboardStats(userId);
+  }
 
   @Get('export')
-  @ApiOperation({ summary: 'Descargar reporte de transacciones en Excel' })
+  @ApiOperation({ summary: 'Descargar Excel de transacciones' })
   @ApiProduces(
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ) // 👈 Le avisa a Swagger qué devuelve
+  )
   async exportTransactions(
     @CurrentUser('id') userId: string,
-    @Res() res: Response, // 👈 Inyectamos la respuesta nativa de Express
+    @Res() res: Response,
   ) {
-    // 1. Configuramos los Headers para descarga
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="transactions.xlsx"',
+      'attachment; filename="movimientos.xlsx"',
     );
 
-    // 2. Llamamos al servicio pasando el objeto 'res' para que escriba el stream
-    await this.reportsService.getTransactionsReport(userId, res);
-  }
-
-  @Get('dashboard')
-  @ApiOperation({
-    summary: 'Obtener datos resumidos para gráficos (Dashboard)',
-  })
-  async getDashboard(@CurrentUser('id') userId: string) {
-    return this.reportsService.getDashboardStats(userId);
+    await this.exportsService.exportTransactionsToExcel(userId, res);
   }
 }
