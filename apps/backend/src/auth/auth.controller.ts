@@ -59,24 +59,29 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   googleAuthRedirect(@Req() req: RequestWithUser, @Res() res: Response) {
-    // 👇 Validación defensiva: Si por alguna razón user no existe, cortamos
     if (!req.user) {
-      return res.redirect('http://localhost:5173/login?error=auth_failed');
+      // 👇 Aquí también deberíamos usar la variable de entorno
+      const frontend = this.configService.get<string>('FRONTEND_URL');
+      if (!frontend) throw new Error('FRONTEND_URL not configured');
+
+      return res.redirect(`${frontend}/login?error=auth_failed`);
     }
 
     const user = req.user;
-
-    // Al usar user.id y user.email, TS ya sabe que existen por la interfaz User
     const token = this.authService.generateToken(user.id, user.email);
 
-    // 👇 Forzamos el tipo string para calmar al linter sobre ConfigService
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ??
-      'http://localhost:5173/dashboard';
+    // 👇 CAMBIO IMPORTANTE: Validar configuración
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
 
-    // 👇 AGREGA ESTE LOG ESPÍA:
+    if (!frontendUrl) {
+      // En desarrollo podríamos tolerarlo, pero es mejor fallar rápido para darte cuenta
+      console.error('🚨 CRITICAL: FRONTEND_URL is not defined in .env');
+      return res
+        .status(500)
+        .send('Server Misconfiguration: Missing FRONTEND_URL');
+    }
+
     const finalUrl = `${frontendUrl}/oauth/callback?token=${token}`;
-
     return res.redirect(finalUrl);
   }
 }
