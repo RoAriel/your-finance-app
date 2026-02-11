@@ -14,7 +14,7 @@ import { AccountType } from '../../accounts/types'; // Ajusta ruta
 import type { Transaction } from '../types';
 
 export const TransactionsPage = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
   // --- ESTADOS DE UI ---
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -37,7 +37,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
     e.preventDefault();
     setError(null); // Limpiamos errores previos
 
-    const data: CreateCategoryDTO = { name, type, isFixed, color, icon };
+    const data: CreateCategoryDTO = { name, type, color, icon };
 
     try {
       if (categoryToEdit) {

@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
-import { useCategories, useDeleteCategory } from '../hooks/useCategories';
-import { CategoryCard } from '../components/CategoryCard'; // Asegúrate de tener este componente
+import { useCategories } from '../hooks/useCategories'; // 👈 FIX: Solo importamos el hook unificado
+import { CategoryCard } from '../components/CategoryCard';
 import { CategoryModal } from '../components/CategoryModal';
 import { CategoryType } from '../types';
 import type { Category } from '../types';
 import { useConfirm } from '@/context/ConfirmContext';
 
 export const CategoriesPage = () => {
-  const { categories: rawData, isLoading } = useCategories();
-  const deleteMutation = useDeleteCategory();
+  // 👇 FIX: Extraemos deleteCategory del hook unificado
+  const { categories: rawData, isLoading, deleteCategory } = useCategories();
+
   const { confirm } = useConfirm();
 
   // Estados UI
@@ -19,7 +20,6 @@ export const CategoriesPage = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   // --- LÓGICA DE FILTRADO ---
-  // Aplanamos la lista para mostrarla en Grid, pero mantenemos la referencia al padre
   const filteredCategories = (rawData || []).filter((cat) => {
     // 1. Filtro por Tipo (Desplegable)
     const matchesType =
@@ -35,7 +35,7 @@ export const CategoriesPage = () => {
     return matchesType && matchesSearch;
   });
 
-  // Función auxiliar para obtener el nombre del padre (si tiene)
+  // Función auxiliar para obtener el nombre del padre
   const getParentName = (parentId: string | null) => {
     if (!parentId) return null;
     const parent = rawData?.find((c) => c.id === parentId);
@@ -75,7 +75,8 @@ export const CategoriesPage = () => {
       confirmText: 'Sí, eliminar',
       variant: 'danger',
       onConfirm: async () => {
-        await deleteMutation.mutateAsync(id);
+        // 👇 FIX: Llamada directa a la función del hook
+        await deleteCategory(id);
       },
     });
   };
@@ -151,7 +152,6 @@ export const CategoriesPage = () => {
               <CategoryCard
                 key={category.id}
                 category={category}
-                // 👇 Pasamos el nombre del padre como prop extra (necesitarás ajustar CategoryCard levemente)
                 parentName={parentName}
                 onEdit={handleOpenEdit}
                 onDelete={handleDelete}

@@ -24,7 +24,7 @@ export const CategorySelector = ({
   excludeId,
   disabled = false,
 }: Props) => {
-  const { categories, isLoading } = useCategories(type);
+  const { categories, isLoading } = useCategories({ type });
 
   const tree = useMemo(() => {
     if (!categories) return [];
