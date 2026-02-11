@@ -33,8 +33,7 @@ export class TransactionsService {
       userId,
     });
 
-    // 1. Validar Cuenta (Account)
-    // Usamos findFirst para asegurar que sea del usuario
+    // 1. Validar Cuenta
     const account = await this.prisma.account.findFirst({
       where: { id: accountId, userId },
     });
@@ -52,14 +51,10 @@ export class TransactionsService {
 
       if (!category) throw new NotFoundException('Categoría no encontrada');
 
-      // Validar que la categoría sea del usuario
       if (category.userId !== userId)
         throw new BadRequestException('Categoría inválida');
 
-      // 🔴 VALIDACIÓN DE COHERENCIA 🔴
-      // Si la categoría es INCOME, la transacción debe ser INCOME.
-      // (Ignoramos si la categoría es BOTH, ahí permitimos cualquier cosa)
-
+      // Validación de coherencia
       const catTypeStr = category.type;
       const transTypeStr = type as string;
 
@@ -72,7 +67,7 @@ export class TransactionsService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        // A. Crear la transacción
+        // A. Crear
         const newTransaction = await tx.transaction.create({
           data: {
             ...rest,
@@ -81,7 +76,10 @@ export class TransactionsService {
             userId,
             accountId,
             currency: account.currency,
+            // Si hay categoryId lo usa, si es undefined lo ignora
+            categoryId: categoryId || undefined,
           },
+          // ✅ FIX: Incluimos relaciones al crear para que el frontend reciba el objeto completo
           include: {
             category: true,
             account: true,
@@ -92,7 +90,7 @@ export class TransactionsService {
         const operation =
           type === TransactionType.INCOME ? 'increment' : 'decrement';
 
-        // C. Actualizar la cuenta
+        // C. Actualizar cuenta
         await tx.account.update({
           where: { id: accountId },
           data: {
@@ -176,6 +174,7 @@ export class TransactionsService {
           where,
           skip,
           take: limit,
+          // ✅ FIX: Aquí es donde ocurre la magia. Esto ya lo tenías, asegúrate de guardar.
           include: {
             category: true,
             account: true,
@@ -184,11 +183,6 @@ export class TransactionsService {
         }),
         this.prisma.transaction.count({ where }),
       ]);
-
-      this.logger.logSuccess('Find transactions', {
-        count: data.length,
-        total,
-      });
 
       return createPaginatedResponse<Transaction>(data, total, page, limit);
     } catch (error) {
@@ -216,8 +210,6 @@ export class TransactionsService {
         balanceByCurrency[acc.currency] += amount;
       });
 
-      this.logger.logSuccess('Calculate balance', { balanceByCurrency });
-
       return {
         netWorth: balanceByCurrency,
       };
@@ -238,7 +230,7 @@ export class TransactionsService {
       );
     }
 
-    // 1. Validar Coherencia si cambian Categoría o Tipo
+    // Validar Coherencia
     const targetCategoryId = dto.categoryId ?? oldTransaction.categoryId;
     const targetType = dto.type ?? oldTransaction.type;
 
@@ -260,8 +252,7 @@ export class TransactionsService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        // A. REVERTIR impacto anterior
-        // Usamos casting a string para evitar líos de Enums importados de lugares distintos
+        // A. REVERTIR
         const oldTypeStr = oldTransaction.type;
         const reverseOp = oldTypeStr === 'INCOME' ? 'decrement' : 'increment';
 
@@ -270,13 +261,13 @@ export class TransactionsService {
           data: { balance: { [reverseOp]: oldTransaction.amount } },
         });
 
-        // B. PREPARAR nuevos datos
+        // B. PREPARAR
         const newAmount =
           dto.amount !== undefined ? dto.amount : oldTransaction.amount;
         const newType = dto.type ? dto.type : oldTransaction.type;
         const newAccountId = dto.accountId || oldTransaction.accountId!;
 
-        // Cambio de cuenta (si aplica)
+        // Cambio de cuenta
         if (dto.accountId && dto.accountId !== oldTransaction.accountId) {
           const newAccount = await tx.account.findFirst({
             where: { id: dto.accountId, userId },
@@ -285,7 +276,7 @@ export class TransactionsService {
             throw new NotFoundException('Nueva cuenta no encontrada');
         }
 
-        // C. APLICAR nuevo impacto
+        // C. APLICAR
         const newTypeStr = newType;
         const applyOp = newTypeStr === 'INCOME' ? 'increment' : 'decrement';
 
@@ -300,9 +291,13 @@ export class TransactionsService {
           data: {
             ...dto,
             accountId: newAccountId,
-            type: newType, // Prisma se encarga del Enum
+            type: newType,
           },
-          include: { category: true },
+          // ✅ FIX: Agregamos account: true para consistencia
+          include: {
+            category: true,
+            account: true,
+          },
         });
       });
 
@@ -325,8 +320,6 @@ export class TransactionsService {
 
     try {
       await this.prisma.$transaction(async (tx) => {
-        // 1. Revertir saldo
-        // Si era INGRESO, al borrarlo RESTAMOS. Si era GASTO, al borrarlo SUMAMOS.
         const typeStr = transaction.type;
         const operation = typeStr === 'INCOME' ? 'decrement' : 'increment';
 
@@ -337,7 +330,6 @@ export class TransactionsService {
           },
         });
 
-        // 2. Soft Delete
         await tx.transaction.update({
           where: { id },
           data: { deletedAt: new Date() },
@@ -355,7 +347,11 @@ export class TransactionsService {
   async findOne(id: string, userId: string) {
     const transaction = await this.prisma.transaction.findFirst({
       where: { id, userId, deletedAt: null },
-      include: { category: true },
+      // ✅ FIX: Agregamos account: true aquí también
+      include: {
+        category: true,
+        account: true,
+      },
     });
 
     if (!transaction) {
