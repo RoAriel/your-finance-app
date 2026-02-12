@@ -7,10 +7,12 @@ import { useTransactions } from '../hooks/useTransactions';
 import { TransactionsTable } from '../components/TransactionsTable';
 import { CreateTransactionModal } from '../components/CreateTransactionModal';
 import { ConfirmationModal } from '@/components/common/ConfirmationModal';
-import { SearchBar } from '@/components/common/SearchBar'; // 👈 Tu buscador (Sprint 4 Parte 1)
-import { Pagination } from '@/components/ui/Pagination'; // 👈 Tu paginación nueva
-import { AccountSelector } from '@/components/common/AccountSelector'; // Ajusta la ruta si moviste el componente
-import { AccountType } from '../../accounts/types'; // Ajusta ruta
+import { SearchBar } from '@/components/common/SearchBar';
+import { Pagination } from '@/components/ui/Pagination';
+import { AccountSelector } from '@/components/common/AccountSelector';
+// 👇 1. IMPORTAMOS EL BOTÓN
+import { ExportButton } from '@/components/common/ExportButton';
+import { AccountType } from '../../accounts/types';
 import type { Transaction } from '../types';
 
 export const TransactionsPage = () => {
@@ -25,7 +27,6 @@ export const TransactionsPage = () => {
     useState<Transaction | null>(null);
 
   // --- ESTADOS DE FILTROS ---
-  // Separamos 'page' para manejar reseteos fáciles al buscar
   const [page, setPage] = useState(1);
 
   const [filters, setFilters] = useState({
@@ -38,20 +39,13 @@ export const TransactionsPage = () => {
   });
 
   // --- HOOK PRINCIPAL ---
-  // 👇 Ahora pasamos los filtros al hook para que el backend haga el trabajo
-  const {
-    transactions, // Usamos la data procesada del hook
-    meta, // Info de paginación que viene del backend
-    isLoading,
-    deleteTransaction,
-  } = useTransactions({
+  const { transactions, meta, isLoading, deleteTransaction } = useTransactions({
     ...filters,
-    page, // Agregamos la página actual
-    limit: 10, // Tamaño de página fijo (o puedes hacerlo dinámico)
+    page,
+    limit: 10,
   });
 
   // --- HANDLERS ---
-
   const handleSearch = (searchValue: string) => {
     setFilters((prev) => ({ ...prev, search: searchValue }));
     setPage(1);
@@ -100,13 +94,24 @@ export const TransactionsPage = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-colors"
-        >
-          <Plus size={20} />
-          <span className="hidden sm:inline">Nueva</span>
-        </button>
+        {/* 👇 2. BOTONES DE ACCIÓN AGRUPADOS */}
+        <div className="flex items-center gap-2">
+          {/* Solo mostramos Excel si no carga y hay datos */}
+          {!isLoading && transactions && transactions.length > 0 && (
+            <ExportButton
+              transactions={transactions}
+              fileName="Mis_Movimientos"
+            />
+          )}
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-colors"
+          >
+            <Plus size={20} />
+            <span className="hidden sm:inline">Nueva</span>
+          </button>
+        </div>
       </div>
 
       {/* 🛠️ BARRA DE FILTROS */}
@@ -124,7 +129,7 @@ export const TransactionsPage = () => {
             type={AccountType.WALLET}
             label="Filtrar por Cuenta"
             placeholder="Todas las cuentas"
-            allowEmpty={true} // 👈 MAGIA: Permite seleccionar "Todas"
+            allowEmpty={true}
             className="w-full"
           />
         </div>

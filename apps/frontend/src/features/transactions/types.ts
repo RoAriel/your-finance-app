@@ -1,4 +1,6 @@
 import { CategoryType } from '../categories/types';
+import type { Category } from '../categories/types';
+import type { Account } from '../accounts/types';
 
 export const TransactionType = {
   INCOME: 'INCOME',
@@ -22,17 +24,21 @@ export interface TransactionCategory {
 // 2. Definimos la Transacción
 export interface Transaction {
   id: string;
-  userId: string;
-  type: TransactionType;
-
-  amount: string; // El backend manda string (Decimal de Prisma)
-  currency: string;
+  amount: number;
   description: string;
-  date: string; // ISO String
-  categoryId?: string | null;
-  category?: TransactionCategory | null;
+  date: string;
+  type: TransactionType;
   accountId: string;
+  categoryId?: string;
+  currency: string;
+
+  // 👇 AGREGA ESTAS DOS LÍNEAS MÁGICAS:
+  account?: Account; // Ahora TypeScript sabe que puede venir el objeto completo
+  category?: Category; // Ahora TypeScript sabe que puede venir el objeto completo
+
   createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
 }
 
 // 3. Paginación (Sin cambios)

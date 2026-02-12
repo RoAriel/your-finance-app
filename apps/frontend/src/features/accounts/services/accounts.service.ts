@@ -7,7 +7,7 @@ export interface TransferDTO {
   targetAccountId: string;
   amount: number;
   description?: string;
-  //date: string;
+  date: string;
 }
 
 export const accountsService = {

@@ -69,4 +69,8 @@ export class QueryTransactionDto extends PaginationDto {
   @IsString()
   @IsNotEmpty()
   accountId: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 }
