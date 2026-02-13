@@ -1,9 +1,13 @@
+import { createElement } from 'react'; // 👈 1. Importamos createElement
 import { Edit2, Trash2, Lock, HelpCircle, ArrowRightLeft } from 'lucide-react';
 import type { Transaction } from '../types';
+import { TransactionType } from '../types';
 import { formatDate } from '@/utils/formatters';
 import { useCurrency } from '@/hooks/useCurrency';
-import { ICON_MAP } from '../../categories/constants';
-import { TransactionType } from '../types';
+
+// 👇 2. Importamos el mapa centralizado
+import { iconMap } from '@/components/common/icons';
+
 interface Props {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
@@ -49,7 +53,6 @@ export const TransactionsTable = ({
         </thead>
         <tbody className="divide-y divide-gray-100">
           {transactions.map((tx) => {
-            // 👇 2. CORRECCIÓN: Usamos el Enum en lugar de strings 'magic'
             const isExpense = tx.type === TransactionType.EXPENSE;
             const isIncome = tx.type === TransactionType.INCOME;
             const isTransfer = tx.type === TransactionType.TRANSFER;
@@ -65,17 +68,20 @@ export const TransactionsTable = ({
               amountColor = 'text-green-600';
               amountSign = '+';
             } else {
-              // Transferencias
               amountColor = 'text-blue-600';
               amountSign = '';
             }
 
-            // Resolución del Icono Visual
-            const iconKey =
+            // 👇 3. Lógica de Resolución de Icono Actualizada
+            // Determinamos el nombre del icono
+            const iconName =
               tx.category?.icon ||
               (isTransfer ? 'ArrowRightLeft' : 'HelpCircle');
-            const IconComp =
-              ICON_MAP[iconKey] || (isTransfer ? ArrowRightLeft : HelpCircle);
+
+            // Buscamos el componente en el mapa. Si no está, usamos los fallbacks importados.
+            const IconComponent =
+              iconMap[iconName] || (isTransfer ? ArrowRightLeft : HelpCircle);
+
             const categoryColor =
               tx.category?.color || (isTransfer ? '#3b82f6' : '#cbd5e1');
 
@@ -96,12 +102,6 @@ export const TransactionsTable = ({
                     <span className="text-xs text-gray-400 sm:hidden">
                       {formatDate(tx.date)}
                     </span>
-                    {/*
-                    {isTransfer && (
-                      <span className="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 border border-blue-100 w-fit">
-                        Transferencia
-                      </span>
-                    )}*/}
                   </div>
                 </td>
 
@@ -120,7 +120,8 @@ export const TransactionsTable = ({
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm shrink-0"
                       style={{ backgroundColor: categoryColor }}
                     >
-                      <IconComp size={14} />
+                      {/* 👇 4. Renderizado Seguro con createElement */}
+                      {createElement(IconComponent, { size: 14 })}
                     </div>
 
                     <div className="flex items-center gap-1.5">

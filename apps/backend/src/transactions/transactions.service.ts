@@ -43,6 +43,14 @@ export class TransactionsService {
         'Cuenta no encontrada o no pertenece al usuario',
       );
     }
+    // 🔒 NUEVO: Validación de Moneda Estricta
+    // Asumimos que dto.currency viene del frontend, o lo comparamos contra la cuenta directamente.
+    // Si el DTO trae moneda, validamos. Si no, usamos la de la cuenta.
+    if (dto.currency && dto.currency !== account.currency) {
+      throw new BadRequestException(
+        `No puedes crear una transacción en ${dto.currency} en una cuenta configurada en ${account.currency}.`,
+      );
+    }
 
     if (categoryId) {
       const category = await this.prisma.category.findUnique({

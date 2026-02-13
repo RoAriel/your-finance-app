@@ -1,15 +1,11 @@
-import {
-  Edit2,
-  Trash2,
-  AlertTriangle,
-  CheckCircle,
-  Ban,
-  HelpCircle,
-} from 'lucide-react';
+// 👇 1. Importamos createElement
+import { createElement } from 'react';
+import { Edit2, Trash2, AlertTriangle, CheckCircle, Ban } from 'lucide-react';
 import type { Budget } from '../services/budgets.service';
 import { formatCurrency } from '@/utils/formatters';
-// 👇 Importamos el mapa de iconos
-import { ICON_MAP } from '../../categories/constants';
+
+// 👇 2. Importamos el mapa nuevo
+import { iconMap } from '@/components/common/icons';
 
 interface Props {
   budget: Budget;
@@ -18,8 +14,8 @@ interface Props {
 }
 
 export const BudgetCard = ({ budget, onEdit, onDelete }: Props) => {
-  // 👇 Resolvemos el icono real
-  const IconComponent = ICON_MAP[budget.categoryIcon] || HelpCircle;
+  // 👇 3. Resolvemos el icono usando el nuevo mapa (Wallet por defecto)
+  const IconComponent = iconMap[budget.categoryIcon] || iconMap['Wallet'];
 
   const getStatusColor = () => {
     switch (budget.status) {
@@ -66,7 +62,8 @@ export const BudgetCard = ({ budget, onEdit, onDelete }: Props) => {
             className="w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm"
             style={{ backgroundColor: budget.categoryColor || '#cbd5e1' }}
           >
-            <IconComponent size={18} />
+            {/* 👇 4. Renderizamos seguro con createElement */}
+            {createElement(IconComponent, { size: 18 })}
           </div>
 
           <div>
@@ -136,7 +133,9 @@ export const BudgetCard = ({ budget, onEdit, onDelete }: Props) => {
         <div className="flex flex-col">
           <span className="text-gray-400 text-xs">Gastado</span>
           <span
-            className={`font-semibold ${budget.status === 'EXCEEDED' ? 'text-red-600' : 'text-gray-800'}`}
+            className={`font-semibold ${
+              budget.status === 'EXCEEDED' ? 'text-red-600' : 'text-gray-800'
+            }`}
           >
             {formatCurrency(budget.spent)}
           </span>

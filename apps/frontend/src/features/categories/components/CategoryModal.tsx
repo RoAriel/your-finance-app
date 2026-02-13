@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { X, Lock, Check, HelpCircle, AlertCircle } from 'lucide-react';
+import { X, Lock, Check, AlertCircle } from 'lucide-react';
 import type { Category, CreateCategoryDTO } from '../types';
 import { CategoryType } from '../types';
 import { useCategories } from '../hooks/useCategories';
-import { CATEGORY_COLORS, AVAILABLE_ICONS, ICON_MAP } from '../constants';
+import { CATEGORY_COLORS } from '../constants';
 import axios from 'axios';
+
+// 👇 1. Importamos iconMap directamente
+import { IconPicker } from '@/components/common/IconPicker';
+import { iconMap } from '@/components/common/icons';
 
 interface Props {
   isOpen: boolean;
@@ -16,7 +20,6 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   const { createCategory, updateCategory, isCreating, isUpdating } =
     useCategories();
 
-  // Inicialización directa de estados
   const [name, setName] = useState(categoryToEdit?.name || '');
   const [type, setType] = useState<CategoryType>(
     categoryToEdit?.type || CategoryType.EXPENSE
@@ -25,19 +28,18 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   const [color, setColor] = useState(
     categoryToEdit?.color || CATEGORY_COLORS[0]
   );
-  const [icon, setIcon] = useState(categoryToEdit?.icon || AVAILABLE_ICONS[0]);
 
-  // Estado para el error visual
+  const [icon, setIcon] = useState(categoryToEdit?.icon || 'Wallet');
+
+  const IconSelected = iconMap[icon] || iconMap['Wallet'];
+
   const [error, setError] = useState<string | null>(null);
-
-  // Resolución segura de icono
-  const IconSelected = ICON_MAP[icon] || HelpCircle;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null); // Limpiamos errores previos
+    setError(null);
 
-    const data: CreateCategoryDTO = { name, type, color, icon };
+    const data: CreateCategoryDTO = { name, type, color, icon, isFixed };
 
     try {
       if (categoryToEdit) {
@@ -45,22 +47,18 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
       } else {
         await createCategory(data);
       }
-      onClose(); // Si todo sale bien, cerramos
+      onClose();
     } catch (err: unknown) {
-      // 🟢 AQUÍ FALTABA ESTA LÍNEA
-      console.error('Error saving category', err); // Para el desarrollador (F12)
-
+      console.error('Error saving category', err);
       let backendMessage = 'Ocurrió un error al guardar la categoría.';
 
-      // Verificamos si es un error de Axios para mostrar el mensaje real del backend
       if (axios.isAxiosError(err) && err.response?.data) {
         const data = err.response.data as { message: string | string[] };
         backendMessage = Array.isArray(data.message)
           ? data.message[0]
           : data.message;
       }
-
-      setError(backendMessage); // 🟢 Esto actualiza la UI visualmente para el usuario
+      setError(backendMessage);
     }
   };
 
@@ -86,7 +84,6 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
 
         {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-          {/* 🔴 Aquí se muestra el error visualmente al usuario */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3 text-sm animate-in slide-in-from-top-2">
               <AlertCircle size={18} className="shrink-0 mt-0.5" />
@@ -105,7 +102,7 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  if (error) setError(null); // Borramos el error al escribir
+                  if (error) setError(null);
                 }}
                 className={`w-full px-4 py-2 border rounded-lg outline-none transition-all ${
                   error
@@ -202,39 +199,26 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           </div>
 
-          {/* Icon Picker */}
+          {/* Icon Picker Integrado */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <label className="block text-sm font-medium text-gray-700">
                 Icono
               </label>
+              {/* Previsualización del seleccionado */}
               <div
                 className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center shadow-sm"
                 style={{ backgroundColor: color }}
               >
+                {/* Ahora renderiza sin error */}
                 <IconSelected size={14} />
               </div>
             </div>
 
-            <div className="grid grid-cols-6 gap-2">
-              {AVAILABLE_ICONS.map((iconName) => {
-                const IconComp = ICON_MAP[iconName];
-                return (
-                  <button
-                    key={iconName}
-                    type="button"
-                    onClick={() => setIcon(iconName)}
-                    className={`p-2 rounded-lg flex items-center justify-center transition-all ${
-                      icon === iconName
-                        ? 'bg-primary text-white shadow-md transform scale-105'
-                        : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-                    }`}
-                  >
-                    <IconComp size={20} />
-                  </button>
-                );
-              })}
-            </div>
+            <IconPicker
+              selectedIcon={icon}
+              onSelect={(newIcon) => setIcon(newIcon)}
+            />
           </div>
         </div>
 

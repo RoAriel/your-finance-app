@@ -6,7 +6,7 @@ import type {
   UpdateTransactionDTO,
   TransactionFilters,
 } from '../types';
-import { transactionKeys } from '../keys'; // 👈 IMPORTANTE: Importamos las llaves
+import { transactionKeys } from '../keys';
 
 export const useTransactions = (overrides?: TransactionFilters) => {
   const queryClient = useQueryClient();
@@ -23,12 +23,10 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     endDate: '',
   });
 
-  // Fusionamos filtros internos con los que vengan de props
   const activeFilters = { ...internalFilters, ...overrides };
 
   // 2. QUERY (Lectura)
   const query = useQuery({
-    // 👇 Usamos la fábrica para generar la key única basada en los filtros
     queryKey: transactionKeys.list(
       activeFilters as unknown as Record<string, unknown>
     ),
@@ -43,10 +41,11 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     mutationFn: (data: CreateTransactionDTO) =>
       transactionsService.create(data),
     onSuccess: () => {
-      // 👇 Invalidamos TO-DO lo relacionado con transacciones (listas, balance, detalles)
+      // 👇 Invalidamos TODO lo necesario para refrescar la UI
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
-      // También refrescamos el dashboard global
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS SELECTOR
+      queryClient.invalidateQueries({ queryKey: ['budgets'] }); // 👈 ACTUALIZA BARRAS PRESUPUESTO
     },
   });
 
@@ -57,6 +56,8 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS SELECTOR
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },
   });
 
@@ -66,6 +67,8 @@ export const useTransactions = (overrides?: TransactionFilters) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS SELECTOR
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },
   });
 
@@ -87,7 +90,7 @@ export const useTransactions = (overrides?: TransactionFilters) => {
   };
 };
 
-// --- Hooks Auxiliares (si los usas en otros componentes) ---
+// --- Hooks Auxiliares ---
 
 export const useCreateTransaction = () => {
   const queryClient = useQueryClient();
@@ -96,6 +99,8 @@ export const useCreateTransaction = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },
   });
 };
@@ -108,6 +113,8 @@ export const useUpdateTransaction = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },
   });
 };
@@ -119,13 +126,14 @@ export const useDeleteTransaction = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: transactionKeys.all });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] }); // 👈 ACTUALIZA SALDOS
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
     },
   });
 };
 
 export const useBalance = () => {
   return useQuery({
-    // 👇 Key específica para el balance
     queryKey: transactionKeys.balance(),
     queryFn: transactionsService.getBalance,
   });

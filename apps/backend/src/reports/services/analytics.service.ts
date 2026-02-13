@@ -12,14 +12,39 @@ export class AnalyticsService {
   async getDashboardStats(userId: string) {
     this.logger.logOperation('Get Dashboard Analytics', { userId });
 
-    // 1. Obtener Totales Globales (Ingresos vs Gastos)
-    // Usamos una sola query para agrupar por tipo
+    // 1. Identificar categorías a excluir (Transferencias)
+    const transferCategories = await this.prisma.category.findMany({
+      where: {
+        userId,
+        name: { contains: 'Transferencia', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    const excludedCategoryIds = transferCategories.map((c) => c.id);
+
     const totals = await this.prisma.transaction.groupBy({
       by: ['type'],
       _sum: { amount: true },
-      where: { userId, deletedAt: null },
+      where: {
+        userId,
+        deletedAt: null,
+
+        // 👇 FILTRO MEJORADO:
+        // 1. Excluimos explícitamente el tipo TRANSFER
+        type: { not: TransactionType.TRANSFER },
+
+        // 2. Excluimos las transacciones (incluidos INCOMES) que pertenezcan
+        // a la categoría "Transferencia". Como AccountsService ahora asigna
+        // esta categoría siempre, las transferencias de entrada serán ignoradas aquí.
+        categoryId: {
+          notIn:
+            excludedCategoryIds.length > 0 ? excludedCategoryIds : undefined,
+        },
+      },
     });
 
+    // 1. Obtener Totales Globales
     const income = Number(
       totals.find((t) => t.type === TransactionType.INCOME)?._sum.amount || 0,
     );
@@ -27,13 +52,13 @@ export class AnalyticsService {
       totals.find((t) => t.type === TransactionType.EXPENSE)?._sum.amount || 0,
     );
 
-    // 2. Obtener Patrimonio Total (Suma de saldos de cuentas)
+    // 2. Obtener Patrimonio Total
     const totalWealth = await this.prisma.account.aggregate({
       _sum: { balance: true },
       where: { userId },
     });
 
-    // 3. Análisis de Gastos (Optimizado: 1 sola query de agrupación)
+    // 3. Análisis de Gastos
     const expensesByCategory = await this.prisma.transaction.groupBy({
       by: ['categoryId'],
       _sum: { amount: true },
@@ -41,10 +66,15 @@ export class AnalyticsService {
         userId,
         type: TransactionType.EXPENSE,
         deletedAt: null,
+        // Opcional: Aseguramos que las transferencias no salgan en gráficos de gastos
+        categoryId: {
+          notIn:
+            excludedCategoryIds.length > 0 ? excludedCategoryIds : undefined,
+        },
       },
     });
 
-    // Obtener detalles de las categorías involucradas (Nombres, Colores, isFixed)
+    // Obtener detalles de las categorías
     const categoryIds = expensesByCategory
       .map((e) => e.categoryId)
       .filter((id): id is string => id !== null);
@@ -53,8 +83,7 @@ export class AnalyticsService {
       where: { id: { in: categoryIds } },
     });
 
-    // 4. Procesamiento en Memoria (Chart Data + Fixed/Variable Split)
-    // Evitamos llamar a la DB 2 veces más para fixed/variable
+    // 4. Procesamiento en Memoria
     let fixedExpenses = 0;
     let variableExpenses = 0;
 
@@ -62,7 +91,6 @@ export class AnalyticsService {
       const amount = Number(item._sum.amount);
       const category = categories.find((c) => c.id === item.categoryId);
 
-      // Sumamos al acumulador correspondiente según la categoría
       if (category?.isFixed) {
         fixedExpenses += amount;
       } else {
@@ -72,7 +100,7 @@ export class AnalyticsService {
       return {
         categoryName: category?.name || 'Otros',
         total: amount,
-        color: category?.color || '#94a3b8', // Gris default
+        color: category?.color || '#94a3b8',
       };
     });
 
@@ -83,7 +111,7 @@ export class AnalyticsService {
         cashFlow: income - expense,
         totalAvailable: Number(totalWealth._sum.balance || 0),
       },
-      chartData: chartData.sort((a, b) => b.total - a.total), // Ordenamos por mayor gasto
+      chartData: chartData.sort((a, b) => b.total - a.total),
       expensesAnalysis: {
         fixed: fixedExpenses,
         variable: variableExpenses,

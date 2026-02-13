@@ -1,14 +1,12 @@
 import { Link } from 'react-router-dom';
-import {
-  AlertTriangle,
-  AlertCircle,
-  ArrowRight,
-  HelpCircle,
-} from 'lucide-react';
+// 👇 1. Importamos createElement
+import { createElement } from 'react';
+import { AlertTriangle, AlertCircle, ArrowRight } from 'lucide-react';
 import { useBudgets } from '../../budget/hooks/useBudgets';
 import { formatCurrency } from '@/utils/formatters';
-// 👇 1. Importamos el mapa de iconos
-import { ICON_MAP } from '../../categories/constants';
+
+// 👇 2. Importamos el mapa nuevo
+import { iconMap } from '@/components/common/icons';
 
 interface Props {
   month: number;
@@ -46,8 +44,8 @@ export const BudgetAlertsWidget = ({ month, year }: Props) => {
         {alerts.map((budget) => {
           const isExceeded = budget.percentage > 100;
 
-          // 👇 2. Resolvemos el Icono Visual
-          const IconComp = ICON_MAP[budget.categoryIcon] || HelpCircle;
+          // 👇 3. Resolvemos el Icono Visual (con fallback a Wallet o HelpCircle)
+          const IconComp = iconMap[budget.categoryIcon] || iconMap['Wallet'];
           const color = budget.categoryColor || '#cbd5e1';
 
           return (
@@ -62,7 +60,8 @@ export const BudgetAlertsWidget = ({ month, year }: Props) => {
                     className="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-sm shrink-0"
                     style={{ backgroundColor: color }}
                   >
-                    <IconComp size={14} />
+                    {/* 👇 4. Renderizamos seguro con createElement */}
+                    {createElement(IconComp, { size: 14 })}
                   </div>
 
                   <div>
@@ -76,7 +75,9 @@ export const BudgetAlertsWidget = ({ month, year }: Props) => {
                       )}
                     </div>
                     <p
-                      className={`text-xs font-bold ${isExceeded ? 'text-red-600' : 'text-yellow-600'}`}
+                      className={`text-xs font-bold ${
+                        isExceeded ? 'text-red-600' : 'text-yellow-600'
+                      }`}
                     >
                       {isExceeded
                         ? 'Has excedido el límite'

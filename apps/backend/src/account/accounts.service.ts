@@ -8,10 +8,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { AppLogger } from '../common/utils/logger.util';
 import { TransferDto } from './dto/transfer.dto';
-// Asegúrate de importar TransactionType correctamente
 import { TransactionType } from '../transactions/dto/create-transaction.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { DepositDto } from './dto/deposit.dto';
+// 👇 IMPORTANTE: Necesitamos esto para crear la categoría si no existe
+import { CategoryType } from '@prisma/client';
 
 @Injectable()
 export class AccountsService {
@@ -24,7 +25,6 @@ export class AccountsService {
     try {
       this.logger.logOperation(operation, { userId, type: dto.type });
 
-      // 👇 Usamos prisma.account
       const account = await this.prisma.account.create({
         data: {
           ...dto,
@@ -46,15 +46,13 @@ export class AccountsService {
     try {
       this.logger.logOperation(operation, { userId });
 
-      // 👇 Usamos prisma.account
       const accounts = await this.prisma.account.findMany({
         where: { userId },
-        orderBy: { createdAt: 'asc' }, // Orden cronológico
+        orderBy: { createdAt: 'asc' },
       });
 
       this.logger.logSuccess(operation, { count: accounts.length });
 
-      // Mapeo para calcular Progreso (útil para SAVINGS)
       return accounts.map((acc) => {
         const balance = Number(acc.balance);
         const targetAmount = acc.targetAmount ? Number(acc.targetAmount) : 0;
@@ -66,7 +64,7 @@ export class AccountsService {
 
         return {
           ...acc,
-          balance, // Convertido a Number
+          balance,
           targetAmount: targetAmount > 0 ? targetAmount : null,
           progress: Math.round(progress),
         };
@@ -93,22 +91,20 @@ export class AccountsService {
         throw new ForbiddenException('Not your account');
 
       const result = await this.prisma.$transaction(async (tx) => {
-        // A. Actualizar saldo
         const updatedAccount = await tx.account.update({
           where: { id: accountId },
           data: { balance: { increment: amount } },
         });
 
-        // B. Crear Transaction
         await tx.transaction.create({
           data: {
             amount: amount,
             description: description || 'Depósito manual',
             date: new Date(),
-            type: TransactionType.INCOME, // Asegúrate que coincida con tu Enum
+            type: TransactionType.INCOME,
             userId,
-            accountId: accountId, // 👈 CAMBIO CRÍTICO: accountId
-            currency: account.currency, // Buena práctica agregar la moneda
+            accountId: accountId,
+            currency: account.currency,
           },
         });
 
@@ -134,7 +130,6 @@ export class AccountsService {
         throw new BadRequestException('Cannot transfer to the same account');
       }
 
-      // Validaciones
       const sourceAccount = await this.prisma.account.findUnique({
         where: { id: sourceAccountId },
       });
@@ -147,7 +142,6 @@ export class AccountsService {
       if (sourceAccount.userId !== userId)
         throw new ForbiddenException('Not owner of source account');
 
-      // Validar Moneda (Opcional, pero recomendado)
       if (sourceAccount.currency !== targetAccount.currency) {
         throw new BadRequestException('Currency mismatch');
       }
@@ -156,9 +150,29 @@ export class AccountsService {
         throw new BadRequestException('Insufficient funds');
       }
 
+      // 👇 LOGICA NUEVA: Buscar o crear la categoría "Transferencia"
+      let transferCategory = await this.prisma.category.findFirst({
+        where: {
+          userId,
+          name: 'Transferencia',
+        },
+      });
+
+      if (!transferCategory) {
+        transferCategory = await this.prisma.category.create({
+          data: {
+            name: 'Transferencia',
+            icon: 'ArrowRightLeft',
+            color: '#64748B',
+            type: CategoryType.EXPENSE,
+            isFixed: false,
+            userId,
+          },
+        });
+      }
+
       const transactionDate = date ? new Date(date) : new Date();
 
-      // 🔥 Transacción Atómica
       const result = await this.prisma.$transaction(async (tx) => {
         // 1. Restar Origen
         const updatedSource = await tx.account.update({
@@ -174,8 +188,9 @@ export class AccountsService {
             date: transactionDate,
             type: TransactionType.TRANSFER,
             userId,
-            accountId: sourceAccountId, // 👈 CAMBIO: accountId
+            accountId: sourceAccountId,
             currency: sourceAccount.currency,
+            categoryId: transferCategory.id, // 👈 ASIGNAMOS CATEGORÍA
           },
         });
 
@@ -195,8 +210,9 @@ export class AccountsService {
             date: transactionDate,
             type: TransactionType.INCOME,
             userId,
-            accountId: targetAccountId, // 👈 CAMBIO: accountId
+            accountId: targetAccountId,
             currency: targetAccount.currency,
+            categoryId: transferCategory.id, // 👈 ASIGNAMOS CATEGORÍA
           },
         });
 
@@ -212,7 +228,6 @@ export class AccountsService {
   }
 
   async remove(userId: string, id: string) {
-    // Ojo: cambié el orden de los params para ser consistente si quieres
     const account = await this.prisma.account.findFirst({
       where: { id, userId },
     });

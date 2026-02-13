@@ -1,11 +1,14 @@
-import { Edit2, Lock, HelpCircle, Trash2, CornerDownRight } from 'lucide-react';
+// 👇 1. Importamos createElement y el nuevo iconMap
+import { createElement } from 'react';
+import { Edit2, Lock, Trash2, CornerDownRight } from 'lucide-react';
 import type { Category } from '../types';
 import { CategoryType } from '../types';
-import { ICON_MAP } from '../constants';
+
+// 👇 2. Usamos el mapa centralizado nuevo
+import { iconMap } from '@/components/common/icons';
 
 interface Props {
   category: Category;
-  // 👇 1. Recibimos el nombre del padre (puede ser null)
   parentName?: string | null;
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
@@ -17,7 +20,10 @@ export const CategoryCard = ({
   onEdit,
   onDelete,
 }: Props) => {
-  const IconComponent = ICON_MAP[category.icon || 'Home'] || HelpCircle;
+  // 👇 3. Buscamos el componente en el nuevo mapa
+  // Si no encuentra el icono (ej: "Zap"), usa "Wallet" por defecto
+  const IconComponent = iconMap[category.icon] || iconMap['Wallet'];
+
   const color = category.color || '#cbd5e1';
 
   return (
@@ -28,7 +34,8 @@ export const CategoryCard = ({
           className="w-12 h-12 rounded-full flex items-center justify-center text-white shadow-sm shrink-0"
           style={{ backgroundColor: color }}
         >
-          <IconComponent size={20} />
+          {/* 👇 4. Renderizamos usando createElement para máxima seguridad */}
+          {createElement(IconComponent, { size: 20 })}
         </div>
 
         {/* Contenedor de texto */}
@@ -40,11 +47,11 @@ export const CategoryCard = ({
             {category.name}
           </h3>
 
-          {/* 👇 2. Sección del Padre (Solo se renderiza si es hijo) */}
+          {/* Sección del Padre */}
           {parentName && (
             <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
               <CornerDownRight size={12} className="opacity-50" />
-              <span className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600 truncate max-w-[120px]">
+              <span className="bg-gray-50 px-1.5 py-0.5 rounded text-gray-600 truncate max-w-30">
                 {parentName}
               </span>
             </div>

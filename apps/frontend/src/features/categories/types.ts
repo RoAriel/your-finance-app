@@ -26,6 +26,7 @@ export interface CreateCategoryDTO {
   color?: string;
   icon?: string;
   parentId?: string | null;
+  isFixed?: boolean;
 }
 // 4. DTO para Actualizar (Partial del Create)
 export type UpdateCategoryDTO = Partial<CreateCategoryDTO>;
