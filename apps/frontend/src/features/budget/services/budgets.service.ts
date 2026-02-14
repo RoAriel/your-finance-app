@@ -1,20 +1,29 @@
 import { api } from '@/lib/axios';
 import { cleanObject } from '@/utils/api-helpers';
 
-// 1. Interfaces
+// 1. Interfaces Actualizadas
 export interface Budget {
-  id: string;
+  id?: string; // Opcional (puede ser una categoría sin presupuesto explícito)
   categoryId: string;
   categoryName: string;
   categoryIcon: string;
   categoryColor: string;
+
   month: number;
   year: number;
-  amount: number;
-  spent: number;
-  remaining: number;
+
+  // Valores Monetarios (Calculados por el Backend)
+  amount: number; // Límite asignado
+  spent: number; // Gasto Total (Incluye hijos recursivamente)
+  directSpent: number; // Gasto directo de esta categoría
+  remaining: number; // amount - spent
+
+  // Estado Visual
   percentage: number;
-  status: 'OK' | 'WARNING' | 'EXCEEDED';
+  status: 'OK' | 'WARNING' | 'EXCEEDED' | 'UNBUDGETED';
+
+  // 🔄 Recursividad: Array de hijos del mismo tipo
+  children: Budget[];
 }
 
 export interface CreateBudgetDTO {
@@ -29,9 +38,7 @@ export interface UpdateBudgetDTO {
 }
 
 export const budgetsService = {
-  // Busca presupuestos filtrando por mes y año
   findAll: async (month: number, year: number): Promise<Budget[]> => {
-    // 👇 Usamos cleanObject para limpiar y Axios para serializar params
     const response = await api.get<Budget[]>('/budgets', {
       params: cleanObject({ month, year }),
     });

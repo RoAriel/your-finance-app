@@ -1,117 +1,102 @@
-import { useState } from 'react'; // 👈 Adiós useEffect
-import { X, Save, Loader2 } from 'lucide-react';
-import { useBudgets } from '../hooks/useBudgets';
+import { useState } from 'react';
+import { X, Save } from 'lucide-react';
 import type { Budget } from '../services/budgets.service';
-import { CategorySelector } from '@/components/common/CategorySelector';
-import { CategoryType } from '../../categories/types';
+import { useBudgets } from '../hooks/useBudgets';
+import { formatCurrency } from '@/utils/formatters';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  budgetToEdit: Budget | null;
-  initialMonth: number;
-  initialYear: number;
-  onSuccess: () => void;
+  budgetToEdit?: Budget | null;
+  currentMonth: number;
+  currentYear: number;
 }
 
 export const CreateBudgetModal = ({
   isOpen,
   onClose,
   budgetToEdit,
-  initialMonth,
-  initialYear,
-  onSuccess,
+  currentMonth,
+  currentYear,
 }: Props) => {
-  const { createBudget, updateBudget, isLoading } = useBudgets(
-    initialMonth,
-    initialYear
+  const { createBudget, updateBudget, isCreating, isUpdating } = useBudgets(
+    currentMonth,
+    currentYear
   );
 
-  // ✅ CORRECCIÓN: Inicialización directa basada en props.
-  // Al usar una 'key' única en el padre, estos estados se reinician solos.
-  const [amount, setAmount] = useState(
-    budgetToEdit ? budgetToEdit.amount.toString() : ''
-  );
+  // ✅ CORRECCIÓN 1: Inicialización perezosa (Lazy Initializer)
+  // Como vamos a usar una 'key' en el padre, este useState se ejecutará
+  // cada vez que abramos el modal con un presupuesto distinto.
+  const [amount, setAmount] = useState(() => {
+    if (budgetToEdit && budgetToEdit.amount > 0) {
+      return budgetToEdit.amount.toString();
+    }
+    return '';
+  });
 
-  const [categoryId, setCategoryId] = useState(
-    budgetToEdit ? budgetToEdit.categoryId : ''
-  );
-
-  // ❌ ELIMINADO: El useEffect de sincronización ya no existe.
+  // 🗑️ BORRADO: El useEffect problemático ya no es necesario.
+  /*
+  useEffect(() => {
+     if (isOpen && budgetToEdit) ...
+  }, ...);
+  */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const finalAmount = parseFloat(amount);
+    if (isNaN(finalAmount) || finalAmount < 0) return;
+
+    if (!budgetToEdit) return;
+
     try {
-      if (budgetToEdit) {
-        await updateBudget(budgetToEdit.id, {
-          amount: parseFloat(amount),
-        });
+      // Lógica UPSERT (igual que antes)
+      if (budgetToEdit.id) {
+        await updateBudget(budgetToEdit.id, { amount: finalAmount });
       } else {
         await createBudget({
-          amount: parseFloat(amount),
-          categoryId: categoryId,
-          month: initialMonth,
-          year: initialYear,
+          categoryId: budgetToEdit.categoryId,
+          amount: finalAmount,
+          month: currentMonth,
+          year: currentYear,
         });
       }
-      onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error al guardar:', error);
+      console.error(error);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !budgetToEdit) return null;
+
+  const isLoading = isCreating || isUpdating;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-100 bg-gray-50">
-          <h2 className="text-lg font-bold text-gray-800">
-            {budgetToEdit ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
-          </h2>
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <h3 className="font-bold text-gray-800">Presupuesto</h3>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              Para:{' '}
+              <span className="font-medium text-primary">
+                {budgetToEdit.categoryName}
+              </span>
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-gray-600"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* Categoría (Solo crear) */}
-          {!budgetToEdit && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categoría
-              </label>
-              <CategorySelector
-                value={categoryId}
-                onChange={setCategoryId}
-                type={CategoryType.EXPENSE}
-                placeholder="Selecciona una categoría..."
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Solo se muestran categorías de Gasto.
-              </p>
-            </div>
-          )}
-
-          {/* Categoría (Solo lectura al editar) */}
-          {budgetToEdit && (
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-100 flex items-center gap-3">
-              <span className="text-sm text-gray-500">Categoría:</span>
-              <span className="font-semibold text-gray-800">
-                {budgetToEdit.categoryName}
-              </span>
-            </div>
-          )}
-
-          {/* Monto */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Límite Mensual
             </label>
             <div className="relative">
@@ -120,47 +105,36 @@ export const CreateBudgetModal = ({
               </span>
               <input
                 type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                autoFocus
                 placeholder="0.00"
                 min="0"
                 step="0.01"
-                className="w-full pl-7 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all font-medium"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
+                className="w-full pl-7 pr-4 py-3 text-lg font-semibold text-gray-800 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
+            {budgetToEdit.spent > 0 && (
+              <p className="text-xs text-gray-500 mt-2">
+                Ya has gastado {formatCurrency(budgetToEdit.spent)} este mes.
+              </p>
+            )}
           </div>
 
-          {/* Info Fecha */}
-          <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-lg flex justify-between items-center">
-            <span>Período:</span>
-            <span className="font-bold bg-white px-2 py-0.5 rounded text-blue-800 border border-blue-100 shadow-sm">
-              {initialMonth}/{initialYear}
-            </span>
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading || (!budgetToEdit && !categoryId)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 font-medium shadow-sm"
-            >
-              {isLoading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
+          <button
+            type="submit"
+            disabled={isLoading || !amount}
+            className="w-full py-3 bg-primary hover:bg-primary-hover text-white rounded-xl font-medium shadow-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
                 <Save size={18} />
-              )}
-              Guardar
-            </button>
-          </div>
+                Guardar Presupuesto
+              </>
+            )}
+          </button>
         </form>
       </div>
     </div>
