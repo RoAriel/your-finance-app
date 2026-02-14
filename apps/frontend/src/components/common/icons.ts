@@ -34,6 +34,15 @@ import {
   BicepsFlexed,
   PawPrint,
   Rss,
+  Banknote,
+  Droplet,
+  Flame,
+  Lightbulb,
+  Clapperboard,
+  Tv,
+  MoreHorizontal,
+  MapPin,
+  Laptop,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -74,6 +83,15 @@ export const iconMap: Record<string, LucideIcon> = {
   BicepsFlexed,
   PawPrint,
   Rss,
+  Banknote,
+  Droplet,
+  Flame,
+  Lightbulb,
+  Clapperboard,
+  Tv,
+  MoreHorizontal,
+  MapPin,
+  Laptop,
 };
 
 export const getIcon = (name: string): LucideIcon => {
