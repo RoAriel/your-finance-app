@@ -9,6 +9,8 @@ export interface Budget {
   categoryIcon: string;
   categoryColor: string;
 
+  categoryType: 'INCOME' | 'EXPENSE';
+
   month: number;
   year: number;
 

@@ -1,22 +1,18 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useBudgets } from '../hooks/useBudgets';
-import { BudgetCard } from '../components/BudgetCard';
+import { BudgetRow } from '../components/BudgetRow'; // 👈 Asegúrate de usar BudgetRow
 import { CreateBudgetModal } from '../components/CreateBudgetModal';
 import type { Budget } from '../services/budgets.service';
 import { useConfirm } from '@/context/ConfirmContext';
 import { MonthSelector } from '@/components/common/MonthSelector';
 
-// 👇 HELPER RECURSIVO: Determina si un presupuesto (o sus hijos) es relevante
+// 👇 HELPER RECURSIVO: Determina si un presupuesto es relevante
 const hasActivity = (budget: Budget): boolean => {
-  // 1. Si el propio nodo tiene dinero asignado o gastado, es relevante.
   if (budget.amount > 0 || budget.spent > 0) return true;
-
-  // 2. Si tiene hijos, verificamos si ALGUNO de ellos es relevante.
   if (budget.children && budget.children.length > 0) {
     return budget.children.some((child) => hasActivity(child));
   }
-
   return false;
 };
 
@@ -27,7 +23,7 @@ export const BudgetsPage = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
-  const [showAll, setShowAll] = useState(false); // Toggle para ver vacíos
+  const [showAll, setShowAll] = useState(false);
 
   const { budgets, isLoading, deleteBudget } = useBudgets(
     selectedMonth,
@@ -35,10 +31,15 @@ export const BudgetsPage = () => {
   );
   const { confirm } = useConfirm();
 
-  // 👇 FILTRADO INTELIGENTE
-  const activeBudgets = (budgets || []).filter(
-    (b) => showAll || hasActivity(b)
-  );
+  // 👇 FILTRADO CORREGIDO (Frontend Only)
+  const activeBudgets = (budgets || []).filter((b) => {
+    // 1. Excluimos explícitamente la rama de "Ingresos" por nombre
+    // (Ya que el backend no nos manda el tipo)
+    if (b.categoryName === 'Ingresos') return false;
+
+    // 2. Aplicamos la lógica de actividad / mostrar todos
+    return showAll || hasActivity(b);
+  });
 
   // --- HANDLERS ---
   const handleDateChange = (newDate: Date) => {
@@ -47,7 +48,7 @@ export const BudgetsPage = () => {
   };
 
   const handleOpenCreate = () => {
-    setShowAll(true); // Al crear, mostramos todo para que el usuario elija
+    setShowAll(true);
     setEditingBudget(null);
   };
 
@@ -79,7 +80,6 @@ export const BudgetsPage = () => {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Toggle Ver Todo */}
           <button
             onClick={() => setShowAll(!showAll)}
             className="text-sm font-medium text-gray-500 hover:text-primary transition-colors px-2 whitespace-nowrap"
@@ -103,24 +103,32 @@ export const BudgetsPage = () => {
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Lista */}
       {isLoading ? (
         <div className="flex-1 flex justify-center items-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 overflow-y-auto pb-20">
-          {activeBudgets.map((budget) => (
-            <BudgetCard
-              key={budget.categoryId} // ✅ Key correcta
-              budget={budget}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col mb-20">
+          {/* Header Tabla */}
+          <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div className="col-span-5 pl-12">Categoría</div>
+            <div className="col-span-7">Progreso / Gastado vs Límite</div>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            {activeBudgets.map((budget) => (
+              <BudgetRow
+                key={budget.categoryId} // ✅ Key correcta (categoryId)
+                budget={budget}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
 
           {activeBudgets.length === 0 && (
-            <div className="col-span-full flex flex-col items-center justify-center py-16 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400 bg-gray-50/30">
               <p>No tienes presupuestos activos para esta fecha.</p>
               <button
                 onClick={() => setShowAll(true)}
