@@ -1,10 +1,16 @@
-// apps/frontend/src/features/auth/types.ts
+export const UserRole = {
+  USER: 'USER',
+  ADMIN: 'ADMIN',
+} as const;
+
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export interface User {
   id: string;
   email: string;
   firstName: string; // 👈 Reemplaza a 'name'
   lastName: string; // 👈 Nuevo
+  role: UserRole;
   currency: string;
   avatarUrl?: string;
   // timezone, language, role, etc. pueden agregarse aquí

@@ -1,4 +1,5 @@
 import { api } from '@/lib/axios';
+import { UserRole } from '../../auth/types';
 
 // Definimos la interfaz basada en tu User del AuthContext
 export interface UserProfile {
@@ -8,6 +9,7 @@ export interface UserProfile {
   lastName: string;
   avatarUrl?: string;
   currency: string;
+  role: UserRole; // Asegúrate de que tu backend incluya el rol en la respuesta del perfil
 }
 
 export interface UpdateUserDto {

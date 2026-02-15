@@ -12,6 +12,8 @@ import { RegisterPage } from './features/auth/pages/RegisterPage';
 import { MainLayout } from './layouts/MainLayout';
 import { ProfilePage } from './features/users/pages/ProfilePage';
 import { OAuthCallbackPage } from './features/auth/pages/OAuthCallbackPage';
+import { AdminRoute } from './features/auth/components/AdminRoute';
+import { AdminUsersPage } from './features/admin/pages/AdminUsersPage';
 
 function App() {
   return (
@@ -37,6 +39,10 @@ function App() {
                 <Route path="/budgets" element={<BudgetsPage />} />
                 <Route path="/savings" element={<SavingsPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route element={<AdminRoute />}>
+                  <Route path="/admin/users" element={<AdminUsersPage />} />
+                  {/* <Route path="/admin/settings" element={<AdminSettingsPage />} /> */}
+                </Route>
               </Route>
             </Route>
 

@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { AuthProvider, AccountType, Prisma } from '@prisma/client'; // 👈 Importamos Prisma
+import { AuthProvider, AccountType, Prisma } from '@prisma/client';
 import { DEFAULT_CATEGORIES_HIERARCHY } from '../common/constants/default-categories';
 import { GoogleUser } from './interfaces/google-user.interface';
 
@@ -46,10 +46,11 @@ export class AuthService {
             currency,
             fiscalStartDay: 1,
             authProvider: AuthProvider.LOCAL,
+            role: 'USER', // Valor por defecto explícito (aunque Prisma lo pone solo)
           },
         });
 
-        // 2. Inicializar Activos (DRY ♻️)
+        // 2. Inicializar Activos
         await this.initializeUserAssets(tx, user.id, currency);
 
         return user;
@@ -60,7 +61,8 @@ export class AuthService {
       },
     );
 
-    const token = this.generateToken(newUser.id, newUser.email);
+    // Generamos token incluyendo el rol
+    const token = this.generateToken(newUser.id, newUser.email, newUser.role);
 
     return {
       user: {
@@ -69,6 +71,8 @@ export class AuthService {
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         currency: newUser.currency,
+        role: newUser.role, // 👈 IMPORTANTE: Enviamos el rol al front
+        avatarUrl: newUser.avatarUrl,
       },
       token,
     };
@@ -89,7 +93,8 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const token = this.generateToken(user.id, user.email);
+    // Generamos token incluyendo el rol
+    const token = this.generateToken(user.id, user.email, user.role);
 
     return {
       user: {
@@ -97,13 +102,17 @@ export class AuthService {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        role: user.role, // 👈 IMPORTANTE: Esto arregla el problema del F5
+        currency: user.currency,
+        avatarUrl: user.avatarUrl,
       },
       token,
     };
   }
 
-  generateToken(userId: string, email: string): string {
-    const payload: JwtPayload = { sub: userId, email };
+  // 👇 Actualizado para recibir y guardar el rol
+  generateToken(userId: string, email: string, role: string): string {
+    const payload: JwtPayload = { sub: userId, email, role };
     return this.jwtService.sign(payload);
   }
 
@@ -129,7 +138,6 @@ export class AuthService {
       // Usuario Nuevo -> Crear con transacción
       user = await this.prisma.$transaction(
         async (tx) => {
-          // A. Crear User
           const newUser = await tx.user.create({
             data: {
               email,
@@ -141,10 +149,10 @@ export class AuthService {
               password: null,
               currency: 'ARS',
               fiscalStartDay: 1,
+              role: 'USER',
             },
           });
 
-          // B. Inicializar Activos (DRY ♻️)
           await this.initializeUserAssets(tx, newUser.id, 'ARS');
 
           return newUser;
@@ -159,12 +167,8 @@ export class AuthService {
     return user;
   }
 
-  /**
-   * Método privado para crear la Billetera Default y las Categorías Iniciales.
-   * Se reutiliza tanto en Registro Local como en Google Auth.
-   */
   private async initializeUserAssets(
-    tx: Prisma.TransactionClient, // Recibimos la transacción actual
+    tx: Prisma.TransactionClient,
     userId: string,
     currency: string,
   ) {
@@ -187,7 +191,7 @@ export class AuthService {
       const parent = await tx.category.create({
         data: {
           name: catData.name,
-          type: catData.type, // Ya tipado correctamente gracias a tu fix anterior
+          type: catData.type,
           color: catData.color,
           icon: catData.icon,
           isFixed: catData.isFixed,

@@ -55,4 +55,40 @@ export class UsersService {
     const { password, ...result } = user;
     return result;
   }
+
+  async findAll() {
+    // Devolvemos todos los usuarios sin el password
+    const users = await this.prisma.user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return users.map((user) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...rest } = user;
+      return rest;
+    });
+  }
+
+  async remove(id: string) {
+    // Verificamos existencia
+    await this.findOne(id);
+
+    // Gracias al onDelete: Cascade en el Schema, esto borra todo lo relacionado
+    return this.prisma.user.delete({
+      where: { id },
+    });
+  }
+
+  async updatePassword(id: string, newPasswordRaw: string) {
+    await this.findOne(id); // Verificar existencia
+
+    const hashedPassword = await bcrypt.hash(newPasswordRaw, 10);
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Password updated successfully' };
+  }
 }

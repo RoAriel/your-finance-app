@@ -68,7 +68,11 @@ export class AuthController {
     }
 
     const user = req.user;
-    const token = this.authService.generateToken(user.id, user.email);
+    const token = this.authService.generateToken(
+      user.id,
+      user.email,
+      user.role,
+    );
 
     // 👇 CAMBIO IMPORTANTE: Validar configuración
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
