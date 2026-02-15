@@ -1,12 +1,10 @@
-import { useState } from 'react';
-import { X, Lock, Check, AlertCircle } from 'lucide-react';
+import { useState, useMemo } from 'react'; // 👈 useMemo para filtrar
+import { X, Lock, Check, AlertCircle, FolderTree } from 'lucide-react'; // Icono nuevo
 import type { Category, CreateCategoryDTO } from '../types';
 import { CategoryType } from '../types';
 import { useCategories } from '../hooks/useCategories';
 import { CATEGORY_COLORS } from '../constants';
 import axios from 'axios';
-
-// 👇 1. Importamos iconMap directamente
 import { IconPicker } from '@/components/common/IconPicker';
 import { iconMap } from '@/components/common/icons';
 
@@ -17,7 +15,8 @@ interface Props {
 }
 
 export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
-  const { createCategory, updateCategory, isCreating, isUpdating } =
+  // 1. Traemos las categorías existentes para el selector de padre
+  const { categories, createCategory, updateCategory, isCreating, isUpdating } =
     useCategories();
 
   const [name, setName] = useState(categoryToEdit?.name || '');
@@ -28,18 +27,42 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   const [color, setColor] = useState(
     categoryToEdit?.color || CATEGORY_COLORS[0]
   );
-
   const [icon, setIcon] = useState(categoryToEdit?.icon || 'Wallet');
 
-  const IconSelected = iconMap[icon] || iconMap['Wallet'];
+  // 2. Estado para el Parent ID
+  const [parentId, setParentId] = useState<string | null>(
+    categoryToEdit?.parentId || null
+  );
 
+  const IconSelected = iconMap[icon] || iconMap['Wallet'];
   const [error, setError] = useState<string | null>(null);
+
+  // 3. Filtrar posibles padres (No mostrarse a sí mismo ni a sus hijos si editamos)
+  const availableParents = useMemo(() => {
+    return categories.filter((cat) => {
+      // Solo permitimos categorías del mismo tipo (Gasto -> Gasto)
+      if (cat.type !== type) return false;
+      // Si estamos editando, no podemos seleccionarnos a nosotros mismos
+      if (categoryToEdit && cat.id === categoryToEdit.id) return false;
+      // Opcional: Evitar más de 1 nivel de profundidad si tu lógica lo requiere
+      // if (cat.parentId) return false;
+      return true;
+    });
+  }, [categories, type, categoryToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const data: CreateCategoryDTO = { name, type, color, icon, isFixed };
+    // Incluimos parentId en el DTO
+    const data: CreateCategoryDTO = {
+      name,
+      type,
+      color,
+      icon,
+      isFixed,
+      parentId: parentId || undefined,
+    };
 
     try {
       if (categoryToEdit) {
@@ -51,7 +74,6 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
     } catch (err: unknown) {
       console.error('Error saving category', err);
       let backendMessage = 'Ocurrió un error al guardar la categoría.';
-
       if (axios.isAxiosError(err) && err.response?.data) {
         const data = err.response.data as { message: string | string[] };
         backendMessage = Array.isArray(data.message)
@@ -63,7 +85,6 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
   };
 
   if (!isOpen) return null;
-
   const isLoading = isCreating || isUpdating;
 
   return (
@@ -91,8 +112,8 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           )}
 
-          {/* Formulario */}
           <div className="space-y-4">
+            {/* Nombre */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Nombre
@@ -114,10 +135,14 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
               />
             </div>
 
+            {/* Selector de Tipo (Gasto/Ingreso) */}
             <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-lg">
               <button
                 type="button"
-                onClick={() => setType(CategoryType.EXPENSE)}
+                onClick={() => {
+                  setType(CategoryType.EXPENSE);
+                  setParentId(null);
+                }} // Reseteamos padre al cambiar tipo
                 className={`py-1.5 text-sm font-medium rounded-md transition-all ${
                   type === CategoryType.EXPENSE
                     ? 'bg-white shadow text-gray-900'
@@ -128,7 +153,10 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
               </button>
               <button
                 type="button"
-                onClick={() => setType(CategoryType.INCOME)}
+                onClick={() => {
+                  setType(CategoryType.INCOME);
+                  setParentId(null);
+                }}
                 className={`py-1.5 text-sm font-medium rounded-md transition-all ${
                   type === CategoryType.INCOME
                     ? 'bg-white shadow text-gray-900'
@@ -137,6 +165,29 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
               >
                 Ingreso
               </button>
+            </div>
+
+            {/* 👇 NUEVO: Selector de Categoría Padre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-2">
+                <FolderTree size={14} className="text-gray-400" /> Categoría
+                Padre (Opcional)
+              </label>
+              <select
+                value={parentId || ''}
+                onChange={(e) => setParentId(e.target.value || null)}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-gray-700 appearance-none"
+              >
+                <option value="">Ninguna (Categoría Principal)</option>
+                {availableParents.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                Si seleccionas una, esta categoría será una subcategoría.
+              </p>
             </div>
           </div>
 
@@ -199,22 +250,19 @@ export const CategoryModal = ({ isOpen, onClose, categoryToEdit }: Props) => {
             </div>
           </div>
 
-          {/* Icon Picker Integrado */}
+          {/* Icon Picker */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <label className="block text-sm font-medium text-gray-700">
                 Icono
               </label>
-              {/* Previsualización del seleccionado */}
               <div
                 className="w-6 h-6 rounded bg-primary text-white flex items-center justify-center shadow-sm"
                 style={{ backgroundColor: color }}
               >
-                {/* Ahora renderiza sin error */}
                 <IconSelected size={14} />
               </div>
             </div>
-
             <IconPicker
               selectedIcon={icon}
               onSelect={(newIcon) => setIcon(newIcon)}

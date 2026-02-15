@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { X, Save } from 'lucide-react';
 import type { Budget } from '../services/budgets.service';
 import { useBudgets } from '../hooks/useBudgets';
+import { useCategories } from '@/features/categories/hooks/useCategories'; // 👈 Importamos para buscar nombre
 import { formatCurrency } from '@/utils/formatters';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   budgetToEdit?: Budget | null;
+  initialCategoryId?: string; // 👈 PROP NUEVA: ID pre-seleccionado
   currentMonth: number;
   currentYear: number;
 }
@@ -16,6 +18,7 @@ export const CreateBudgetModal = ({
   isOpen,
   onClose,
   budgetToEdit,
+  initialCategoryId,
   currentMonth,
   currentYear,
 }: Props) => {
@@ -24,9 +27,20 @@ export const CreateBudgetModal = ({
     currentYear
   );
 
-  // ✅ CORRECCIÓN 1: Inicialización perezosa (Lazy Initializer)
-  // Como vamos a usar una 'key' en el padre, este useState se ejecutará
-  // cada vez que abramos el modal con un presupuesto distinto.
+  // Traemos categorías para buscar el nombre si es un presupuesto nuevo
+  const { categories } = useCategories();
+
+  // 1. Identificamos el ID y Nombre de la categoría objetivo
+  const targetCategoryId = budgetToEdit?.categoryId || initialCategoryId;
+
+  const targetCategoryName =
+    budgetToEdit?.categoryName ||
+    categories.find((c) => c.id === targetCategoryId)?.name ||
+    'Categoría';
+
+  const spentAmount = budgetToEdit?.spent || 0;
+
+  // 2. Estado del monto
   const [amount, setAmount] = useState(() => {
     if (budgetToEdit && budgetToEdit.amount > 0) {
       return budgetToEdit.amount.toString();
@@ -34,28 +48,22 @@ export const CreateBudgetModal = ({
     return '';
   });
 
-  // 🗑️ BORRADO: El useEffect problemático ya no es necesario.
-  /*
-  useEffect(() => {
-     if (isOpen && budgetToEdit) ...
-  }, ...);
-  */
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const finalAmount = parseFloat(amount);
     if (isNaN(finalAmount) || finalAmount < 0) return;
 
-    if (!budgetToEdit) return;
+    if (!targetCategoryId) return;
 
     try {
-      // Lógica UPSERT (igual que antes)
-      if (budgetToEdit.id) {
+      if (budgetToEdit?.id) {
+        // A. MODO EDICIÓN (Actualizar monto)
         await updateBudget(budgetToEdit.id, { amount: finalAmount });
       } else {
+        // B. MODO CREACIÓN (Crear nuevo)
         await createBudget({
-          categoryId: budgetToEdit.categoryId,
+          categoryId: targetCategoryId,
           amount: finalAmount,
           month: currentMonth,
           year: currentYear,
@@ -67,7 +75,8 @@ export const CreateBudgetModal = ({
     }
   };
 
-  if (!isOpen || !budgetToEdit) return null;
+  // Validación de apertura: Debe estar abierto y tener al menos un ID de categoría destino
+  if (!isOpen || (!budgetToEdit && !initialCategoryId)) return null;
 
   const isLoading = isCreating || isUpdating;
 
@@ -77,11 +86,13 @@ export const CreateBudgetModal = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
-            <h3 className="font-bold text-gray-800">Presupuesto</h3>
+            <h3 className="font-bold text-gray-800">
+              {budgetToEdit ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}
+            </h3>
             <p className="text-xs text-gray-500 flex items-center gap-1">
               Para:{' '}
               <span className="font-medium text-primary">
-                {budgetToEdit.categoryName}
+                {targetCategoryName}
               </span>
             </p>
           </div>
@@ -114,9 +125,15 @@ export const CreateBudgetModal = ({
                 className="w-full pl-7 pr-4 py-3 text-lg font-semibold text-gray-800 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
-            {budgetToEdit.spent > 0 && (
+
+            {/* Mostrar gasto actual (si existe) para referencia */}
+            {spentAmount > 0 && (
               <p className="text-xs text-gray-500 mt-2">
-                Ya has gastado {formatCurrency(budgetToEdit.spent)} este mes.
+                Ya has gastado{' '}
+                <span className="text-red-500 font-medium">
+                  {formatCurrency(spentAmount)}
+                </span>{' '}
+                en esta categoría este mes.
               </p>
             )}
           </div>
