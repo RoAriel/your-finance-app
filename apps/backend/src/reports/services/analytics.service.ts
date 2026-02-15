@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AppLogger } from '../../common/utils/logger.util';
-import { TransactionType } from '@prisma/client';
+import { TransactionType, Prisma } from '@prisma/client'; // 👈 Importamos Prisma para tipos
 
 @Injectable()
 export class AnalyticsService {
@@ -9,10 +9,11 @@ export class AnalyticsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getDashboardStats(userId: string) {
-    this.logger.logOperation('Get Dashboard Analytics', { userId });
+  // 👇 1. Aceptamos accountId opcional
+  async getDashboardStats(userId: string, accountId?: string) {
+    this.logger.logOperation('Get Dashboard Analytics', { userId, accountId });
 
-    // 1. Identificar categorías a excluir (Transferencias)
+    // --- Lógica existente de exclusión de transferencias ---
     const transferCategories = await this.prisma.category.findMany({
       where: {
         userId,
@@ -20,23 +21,24 @@ export class AnalyticsService {
       },
       select: { id: true },
     });
-
     const excludedCategoryIds = transferCategories.map((c) => c.id);
+    // -----------------------------------------------------
+
+    // 👇 2. Construimos un filtro base reutilizable
+    const commonWhere: Prisma.TransactionWhereInput = {
+      userId,
+      deletedAt: null,
+      ...(accountId && { accountId }), // Si existe accountId, filtra por él
+    };
 
     const totals = await this.prisma.transaction.groupBy({
       by: ['type'],
       _sum: { amount: true },
       where: {
-        userId,
-        deletedAt: null,
+        ...commonWhere, // Usamos el filtro base
 
-        // 👇 FILTRO MEJORADO:
-        // 1. Excluimos explícitamente el tipo TRANSFER
+        // Filtros de exclusión existentes
         type: { not: TransactionType.TRANSFER },
-
-        // 2. Excluimos las transacciones (incluidos INCOMES) que pertenezcan
-        // a la categoría "Transferencia". Como AccountsService ahora asigna
-        // esta categoría siempre, las transferencias de entrada serán ignoradas aquí.
         categoryId: {
           notIn:
             excludedCategoryIds.length > 0 ? excludedCategoryIds : undefined,
@@ -44,7 +46,6 @@ export class AnalyticsService {
       },
     });
 
-    // 1. Obtener Totales Globales
     const income = Number(
       totals.find((t) => t.type === TransactionType.INCOME)?._sum.amount || 0,
     );
@@ -52,21 +53,34 @@ export class AnalyticsService {
       totals.find((t) => t.type === TransactionType.EXPENSE)?._sum.amount || 0,
     );
 
-    // 2. Obtener Patrimonio Total
-    const totalWealth = await this.prisma.account.aggregate({
-      _sum: { balance: true },
-      where: { userId },
-    });
+    // 👇 3. Lógica Diferenciada para Patrimonio (Total Available)
+    let totalAvailable = 0;
 
-    // 3. Análisis de Gastos
+    if (accountId) {
+      // Caso A: Saldo de UNA cuenta específica
+      const account = await this.prisma.account.findUnique({
+        where: { id: accountId },
+        select: { balance: true },
+      });
+      totalAvailable = Number(account?.balance || 0);
+    } else {
+      // Caso B: Suma de TODAS las cuentas (Comportamiento original)
+      const totalWealth = await this.prisma.account.aggregate({
+        _sum: { balance: true },
+        where: { userId },
+      });
+      totalAvailable = Number(totalWealth._sum.balance || 0);
+    }
+
+    // 4. Análisis de Gastos
     const expensesByCategory = await this.prisma.transaction.groupBy({
       by: ['categoryId'],
       _sum: { amount: true },
       where: {
-        userId,
+        ...commonWhere, // Usamos el filtro base (incluye accountId)
         type: TransactionType.EXPENSE,
-        deletedAt: null,
-        // Opcional: Aseguramos que las transferencias no salgan en gráficos de gastos
+
+        // Filtros de exclusión existentes
         categoryId: {
           notIn:
             excludedCategoryIds.length > 0 ? excludedCategoryIds : undefined,
@@ -74,7 +88,7 @@ export class AnalyticsService {
       },
     });
 
-    // Obtener detalles de las categorías
+    // ... (El resto del código de categorías y map se mantiene IDÉNTICO) ...
     const categoryIds = expensesByCategory
       .map((e) => e.categoryId)
       .filter((id): id is string => id !== null);
@@ -83,7 +97,6 @@ export class AnalyticsService {
       where: { id: { in: categoryIds } },
     });
 
-    // 4. Procesamiento en Memoria
     let fixedExpenses = 0;
     let variableExpenses = 0;
 
@@ -109,7 +122,7 @@ export class AnalyticsService {
         income,
         expense,
         cashFlow: income - expense,
-        totalAvailable: Number(totalWealth._sum.balance || 0),
+        totalAvailable, // Ya calculado arriba según el caso
       },
       chartData: chartData.sort((a, b) => b.total - a.total),
       expensesAnalysis: {

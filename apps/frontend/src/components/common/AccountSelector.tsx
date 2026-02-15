@@ -4,31 +4,32 @@ import { AccountType } from '../../features/accounts/types';
 interface Props {
   value: string;
   onChange: (value: string) => void;
-  type?: AccountType; // 'WALLET' | 'SAVINGS' | undefined (todo)
+  type?: AccountType;
   label?: string;
   placeholder?: string;
   className?: string;
   error?: string;
   allowEmpty?: boolean;
+  showAllOption?: boolean; // 👈 NUEVO: Para permitir "Todas las cuentas"
 }
 
 export const AccountSelector = ({
   value,
   onChange,
-  type, // Si pasas AccountType.WALLET, solo muestra billeteras
+  type,
   label = 'Cuenta',
   placeholder = 'Selecciona una cuenta...',
   className = '',
   error,
   allowEmpty = false,
+  showAllOption = false, // 👈 Default false para no romper otros formularios
 }: Props) => {
-  // El hook ya se encarga de filtrar según el prop 'type'
   const { accounts, isLoading } = useAccounts({ type });
 
   return (
     <div className={className}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} <span className="text-red-500">*</span>
+        {label} {error && <span className="text-red-500">*</span>}
       </label>
 
       {isLoading ? (
@@ -44,9 +45,15 @@ export const AccountSelector = ({
               error ? 'border-red-500' : 'border-gray-300'
             }`}
           >
-            <option value="" disabled={!allowEmpty}>
-              {placeholder}
-            </option>
+            {/* 👇 Lógica para mostrar "Todas" o el Placeholder */}
+            {showAllOption ? (
+              <option value="">Todas las Cuentas</option>
+            ) : (
+              <option value="" disabled={!allowEmpty}>
+                {placeholder}
+              </option>
+            )}
+
             {accounts.length > 0 ? (
               accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>

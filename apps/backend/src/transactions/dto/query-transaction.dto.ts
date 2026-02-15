@@ -7,8 +7,7 @@ import {
   IsInt,
   Min,
   Max,
-  IsNotEmpty,
-} from 'class-validator';
+} from 'class-validator'; // Quitamos IsNotEmpty que conflictuaba con IsOptional
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -25,6 +24,7 @@ export enum Currency {
 }
 
 export class QueryTransactionDto extends PaginationDto {
+  // ... (otros campos iguales: search, type, startDate, endDate, categoryId, currency) ...
   @ApiPropertyOptional({ description: 'Buscar por descripción' })
   @IsOptional()
   @IsString()
@@ -50,6 +50,7 @@ export class QueryTransactionDto extends PaginationDto {
   @IsEnum(Currency)
   currency?: Currency;
 
+  // ... (month y year iguales) ...
   @ApiPropertyOptional({ description: 'Mes para filtrar (1-12)' })
   @IsOptional()
   @Type(() => Number)
@@ -65,10 +66,11 @@ export class QueryTransactionDto extends PaginationDto {
   @Min(2000)
   year?: number;
 
+  // 👇 ACTUALIZADO: Filtro por Cuenta
+  @ApiPropertyOptional({ description: 'Filtrar por ID de cuenta' })
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  accountId: string;
+  @IsUUID() // 👈 Más estricto que IsString
+  accountId?: string;
 
   @IsOptional()
   @IsDateString()

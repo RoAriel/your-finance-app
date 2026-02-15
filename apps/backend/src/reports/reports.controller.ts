@@ -1,9 +1,10 @@
-import { Controller, Get, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Res, UseGuards, Query } from '@nestjs/common'; // 👈 Importar Query
 import {
   ApiTags,
   ApiBearerAuth,
   ApiOperation,
   ApiProduces,
+  ApiQuery, // 👈 Opcional: Para documentar en Swagger
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,10 +24,15 @@ export class ReportsController {
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Obtener métricas principales del Dashboard' })
-  async getDashboard(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getDashboardStats(userId);
+  @ApiQuery({ name: 'accountId', required: false, type: String }) // 👈 Documentación Swagger
+  async getDashboard(
+    @CurrentUser('id') userId: string,
+    @Query('accountId') accountId?: string, // 👈 Capturamos el Query Param
+  ) {
+    return this.analyticsService.getDashboardStats(userId, accountId);
   }
 
+  // ... (exportTransactions se mantiene igual)
   @Get('export')
   @ApiOperation({ summary: 'Descargar Excel de transacciones' })
   @ApiProduces(

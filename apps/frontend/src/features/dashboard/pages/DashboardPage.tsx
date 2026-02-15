@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react'; // 👈 Agregamos useMemo
 import { ArrowRight, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom'; // <--- Necesario para navegar
+import { Link } from 'react-router-dom';
 import { useTransactions } from '../../transactions/hooks/useTransactions';
 import { TransactionsTable } from '../../transactions/components/TransactionsTable';
 import { CreateTransactionModal } from '../../transactions/components/CreateTransactionModal';
@@ -14,17 +14,23 @@ import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import type { Transaction } from '../../transactions/types';
 import { useAccounts } from '../../accounts/hooks/useAccounts';
 import { AccountType } from '../../accounts/types';
+import { AccountSelector } from '@/components/common/AccountSelector'; // 👈 Importamos
 
 export const DashboardPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Filtros fijos (Sin página)
+  // 1. Estado para el filtro global de cuenta
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  // 2. Filtros Dinámicos
   const filters = {
     month: currentDate.getMonth() + 1,
     year: currentDate.getFullYear(),
+    accountId: selectedAccountId || undefined, // Si es "", mandamos undefined
   };
 
-  // 1. Hook para TABLA RESUMEN (Solo 5 items, sin paginación)
+  // 3. Hooks dependientes de 'filters'
+  // (Asegúrate de que useTransactions y useDashboardReport acepten accountId internamente)
   const {
     data: transactionsData,
     deleteTransaction,
@@ -35,17 +41,29 @@ export const DashboardPage = () => {
     limit: 5,
   });
 
-  // 2. Hook para REPORTE (Gráficos)
   const { data: reportData, isLoading: isLoadingReport } =
     useDashboardReport(filters);
 
-  const { accounts: wallets, isLoading: isLoadingWallets } = useAccounts({
-    type: AccountType.WALLET,
-  });
-  const totalAvailableLiquidity = wallets.reduce(
-    (acc, curr) => acc + Number(curr.balance),
-    0
+  // 4. Cuentas para el cálculo de saldo local
+  // Traemos TODAS para poder filtrar por ID, no solo wallets
+  const { accounts: allAccounts, isLoading: isLoadingAccounts } = useAccounts(
+    {}
   );
+
+  // 5. Lógica de Saldo Inteligente
+  const displayedBalance = useMemo(() => {
+    if (selectedAccountId) {
+      // Si hay filtro, buscamos esa cuenta específica
+      const account = allAccounts.find((a) => a.id === selectedAccountId);
+      return account ? Number(account.balance) : 0;
+    } else {
+      // Si NO hay filtro, mantenemos tu lógica original: Sumar solo WALLETS (Liquidez)
+      return allAccounts
+        .filter((a) => a.type === AccountType.WALLET)
+        .reduce((acc, curr) => acc + Number(curr.balance), 0);
+    }
+  }, [selectedAccountId, allAccounts]);
+
   // Estados del Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
@@ -66,19 +84,19 @@ export const DashboardPage = () => {
   };
 
   const handleOpenDelete = (id: string) => {
-    setTransactionToDelete(id); // Guardamos el ID y esto abre el modal (porque ID existe)
+    setTransactionToDelete(id);
   };
 
   const handleConfirmDelete = async () => {
     if (transactionToDelete) {
       await deleteTransaction(transactionToDelete);
-      setTransactionToDelete(null); // Cerramos el modal
+      setTransactionToDelete(null);
     }
   };
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header Simplificado */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -92,12 +110,24 @@ export const DashboardPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Controles: Selector Mes + Selector Cuenta + Botón Add */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* 👇 Selector de Cuenta Global */}
+          <div className="w-full sm:w-48">
+            <AccountSelector
+              value={selectedAccountId}
+              onChange={setSelectedAccountId}
+              label="" // Sin label para que quede inline limpio
+              showAllOption={true} // Habilita "Todas las cuentas"
+              className="mb-0" // Reset margin inferior del componente base
+            />
+          </div>
+
           <MonthSelector currentDate={currentDate} onChange={setCurrentDate} />
 
           <button
             onClick={handleOpenCreate}
-            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-hover shadow-sm md:hidden"
+            className="bg-primary text-white p-2 rounded-lg hover:bg-primary-hover shadow-sm md:hidden self-end sm:self-auto"
           >
             <Plus size={24} />
           </button>
@@ -106,16 +136,16 @@ export const DashboardPage = () => {
 
       {/* Grid Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna Izquierda: Stats y Gráfico (Ocupa 2/3) */}
+        {/* Columna Izquierda */}
         <div className="lg:col-span-2 space-y-6">
           <StatsCards
             income={reportData?.summary?.income || 0}
             expenses={reportData?.summary?.expense || 0}
-            // Aquí inyectamos el saldo calculado en frontend (o usamos el del reporte si prefieres)
-            // Según tu regla de negocio 2: "Mostrar Dinero Disponible (Suma de balances de wallets)"
-            balance={totalAvailableLiquidity}
-            isLoading={isLoadingReport || isLoadingWallets}
+            // Pasamos el saldo calculado dinámicamente
+            balance={displayedBalance}
+            isLoading={isLoadingReport || isLoadingAccounts}
           />
+
           <BudgetAlertsWidget month={filters.month} year={filters.year} />
 
           {reportData?.expensesAnalysis && (
@@ -131,7 +161,7 @@ export const DashboardPage = () => {
           />
         </div>
 
-        {/* Columna Derecha: Lista Rápida (Ocupa 1/3) */}
+        {/* Columna Derecha */}
         <div className="lg:col-span-1">
           <section className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col h-full">
             <div className="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -145,7 +175,6 @@ export const DashboardPage = () => {
             </div>
 
             <div className="overflow-hidden">
-              {/* Usamos la misma tabla pero en contexto reducido */}
               <TransactionsTable
                 transactions={transactionsData?.data || []}
                 onEdit={handleOpenEdit}

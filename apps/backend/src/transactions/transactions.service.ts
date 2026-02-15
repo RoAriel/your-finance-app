@@ -43,9 +43,19 @@ export class TransactionsService {
         'Cuenta no encontrada o no pertenece al usuario',
       );
     }
-    // 🔒 NUEVO: Validación de Moneda Estricta
-    // Asumimos que dto.currency viene del frontend, o lo comparamos contra la cuenta directamente.
-    // Si el DTO trae moneda, validamos. Si no, usamos la de la cuenta.
+
+    // 🛑 FIX CRÍTICO: VALIDACIÓN DE FONDOS (OVERDRAFT PROTECTION)
+    // Si es GASTO o TRANSFERENCIA, verificamos que tenga saldo suficiente.
+    if (type === TransactionType.EXPENSE || type === TransactionType.TRANSFER) {
+      const currentBalance = Number(account.balance);
+      if (currentBalance < amount) {
+        throw new BadRequestException(
+          `Fondos insuficientes. Tu saldo es $${currentBalance.toFixed(2)} y intentas gastar $${amount.toFixed(2)}`,
+        );
+      }
+    }
+
+    // 🔒 Validación de Moneda Estricta
     if (dto.currency && dto.currency !== account.currency) {
       throw new BadRequestException(
         `No puedes crear una transacción en ${dto.currency} en una cuenta configurada en ${account.currency}.`,
@@ -84,10 +94,9 @@ export class TransactionsService {
             userId,
             accountId,
             currency: account.currency,
-            // Si hay categoryId lo usa, si es undefined lo ignora
             categoryId: categoryId || undefined,
           },
-          // ✅ FIX: Incluimos relaciones al crear para que el frontend reciba el objeto completo
+          // ✅ FIX: Incluimos relaciones al crear
           include: {
             category: true,
             account: true,
@@ -182,7 +191,6 @@ export class TransactionsService {
           where,
           skip,
           take: limit,
-          // ✅ FIX: Aquí es donde ocurre la magia. Esto ya lo tenías, asegúrate de guardar.
           include: {
             category: true,
             account: true,
@@ -301,7 +309,6 @@ export class TransactionsService {
             accountId: newAccountId,
             type: newType,
           },
-          // ✅ FIX: Agregamos account: true para consistencia
           include: {
             category: true,
             account: true,
@@ -355,7 +362,6 @@ export class TransactionsService {
   async findOne(id: string, userId: string) {
     const transaction = await this.prisma.transaction.findFirst({
       where: { id, userId, deletedAt: null },
-      // ✅ FIX: Agregamos account: true aquí también
       include: {
         category: true,
         account: true,
