@@ -10,13 +10,20 @@ import { ConfirmationModal } from '@/components/common/ConfirmationModal';
 import { SearchBar } from '@/components/common/SearchBar';
 import { Pagination } from '@/components/ui/Pagination';
 import { AccountSelector } from '@/components/common/AccountSelector';
-// 👇 1. IMPORTAMOS EL BOTÓN
 import { ExportButton } from '@/components/common/ExportButton';
 import { AccountType } from '../../accounts/types';
 import type { Transaction } from '../types';
 
+// 👇 IMPORTS ASUMIDOS (Ajusta la ruta si es distinta en tu proyecto)
+import { useAuth } from '@/features/auth/hooks/useAuth'; // Hook para obtener info del usuario
+import { useAccounts } from '@/features/accounts/hooks/useAccounts';
+
 export const TransactionsPage = () => {
   const [searchParams] = useSearchParams();
+
+  // 👇 1. OBTENER USUARIO Y CUENTAS
+  const { user } = useAuth(); // Para el nombre del usuario
+  const { accounts } = useAccounts(); // Para buscar el nombre de la cuenta
 
   // --- ESTADOS DE UI ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -44,6 +51,15 @@ export const TransactionsPage = () => {
     page,
     limit: 10,
   });
+
+  // 👇 2. LÓGICA PARA OBTENER EL NOMBRE DE LA CUENTA SELECCIONADA
+  const getSelectedAccountName = () => {
+    if (!filters.accountId || !accounts) return undefined;
+    const account = accounts.find((acc) => acc.id === filters.accountId);
+    return account ? account.name : undefined;
+  };
+
+  const selectedAccountName = getSelectedAccountName();
 
   // --- HANDLERS ---
   const handleSearch = (searchValue: string) => {
@@ -83,6 +99,8 @@ export const TransactionsPage = () => {
     setEditingTransaction(null);
   };
 
+  const fullName = user ? `${user.firstName} ${user.lastName}` : 'Usuario';
+
   return (
     <div className="p-6 space-y-6 h-full flex flex-col">
       {/* Header */}
@@ -94,13 +112,14 @@ export const TransactionsPage = () => {
           </p>
         </div>
 
-        {/* 👇 2. BOTONES DE ACCIÓN AGRUPADOS */}
+        {/* Botones de acción */}
         <div className="flex items-center gap-2">
-          {/* Solo mostramos Excel si no carga y hay datos */}
+          {/* 👇 3. PASAMOS PROPS AL BOTÓN DE EXPORTAR */}
           {!isLoading && transactions && transactions.length > 0 && (
             <ExportButton
-              transactions={transactions}
-              fileName="Mis_Movimientos"
+              accountId={filters.accountId}
+              accountName={selectedAccountName} // Pasamos el nombre real (ej: "Banco X")
+              userName={fullName} // Pasamos el nombre del usuario
             />
           )}
 

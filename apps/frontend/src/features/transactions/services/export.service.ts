@@ -1,32 +1,33 @@
 import { api } from '@/lib/axios';
 
-export type ExportFormat = 'excel' | 'csv' | 'pdf';
+// 1. Actualizamos los tipos para soportar los dos PDFs
+export type ExportFormat = 'excel' | 'csv' | 'pdf-table' | 'pdf-visual';
 
 export const exportService = {
   downloadTransactions: async (
     format: ExportFormat,
     accountId?: string | null
   ) => {
-    // 1. Mapeo de Endpoints
+    // 2. Mapeo de Endpoints actualizado
     const endpoints: Record<ExportFormat, string> = {
       excel: '/reports/export', // .xlsx
       csv: '/reports/export/csv', // .csv
-      pdf: '/reports/export/pdf', // .pdf
+      'pdf-table': '/reports/export/pdf/table', // .pdf (Listado)
+      'pdf-visual': '/reports/export/pdf/visual', // .pdf (Gráficos/Imprimible)
     };
 
-    // 2. Configurar Params (limpiamos si es null/undefined)
     const params: Record<string, string> = {};
+    // Si accountId existe (y no es 'all' o null), lo agregamos
     if (accountId) {
       params.accountId = accountId;
     }
 
-    // 3. Petición al Backend
     const response = await api.get(endpoints[format], {
       params,
-      responseType: 'blob', // 👈 CLAVE: Indica que esperamos un archivo binario
+      responseType: 'blob',
       timeout: 120000,
     });
 
-    return response; // Devolvemos la respuesta completa para acceder a headers si hiciera falta
+    return response;
   },
 };
